@@ -1,5 +1,17 @@
 //! PCM helpers. The Voice PE firmware decodes FLAC and MP3 but *not* WAV, so anything
-//! generated on the Mac is encoded to FLAC (pure Rust, via `flacenc`) before it's served.
+//! generated on this computer is encoded to FLAC (pure Rust, via `flacenc`) before it's
+//! served to the device.
+//!
+//! ```no_run
+//! # async fn demo() -> anyhow::Result<()> {
+//! use havoice::audio::{Pcm, envelope, sine};
+//!
+//! // a one-second 440 Hz beep with a soft attack and release
+//! let mut pcm = Pcm::new(22_050);
+//! pcm.push(1.0, |t| 0.5 * sine(440.0, t) * envelope(t, 1.0, 0.02, 0.3));
+//! havoice::VoicePe::from_env().await?.play_pcm(&pcm, true).await?;
+//! # Ok(()) }
+//! ```
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use flacenc::component::BitRepr;
@@ -8,11 +20,14 @@ use flacenc::error::Verify;
 /// Mono 16-bit PCM.
 #[derive(Debug, Clone, Default)]
 pub struct Pcm {
+    /// Sample rate in Hz.
     pub rate: u32,
+    /// Signed 16-bit samples.
     pub samples: Vec<i16>,
 }
 
 impl Pcm {
+    /// Empty audio at `rate` Hz (22 050 is plenty for speech and beeps).
     pub fn new(rate: u32) -> Self {
         Self {
             rate,
@@ -20,6 +35,7 @@ impl Pcm {
         }
     }
 
+    /// Duration in seconds.
     pub fn seconds(&self) -> f32 {
         self.samples.len() as f32 / self.rate as f32
     }
@@ -36,6 +52,7 @@ impl Pcm {
         self
     }
 
+    /// Append `secs` seconds of silence.
     pub fn silence(&mut self, secs: f32) -> &mut Self {
         self.push(secs, |_| 0.0)
     }

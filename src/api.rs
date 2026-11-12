@@ -1,5 +1,25 @@
-//! Thin async layer over `esphome-client`: one reader task fans device messages out
-//! to any number of subscribers; writes go straight through a cloned write stream.
+//! Lower-level ESPHome native API client, a thin async layer over
+//! [`esphome-client`](https://crates.io/crates/esphome-client).
+//!
+//! One reader task fans every device message out to any number of subscribers
+//! ([`Client::subscribe`]); writes go straight through a cloned write stream
+//! ([`Client::send`]). Use it for anything [`crate::VoicePe`] doesn't wrap:
+//!
+//! ```no_run
+//! # async fn demo() -> anyhow::Result<()> {
+//! use havoice::proto::{self as pb, EspHomeMessage as Msg};
+//!
+//! let pe = havoice::VoicePe::from_env().await?;
+//! let mut rx = pe.client().subscribe();
+//! pe.client().send(pb::DeviceInfoRequest {}).await?;
+//! while let Ok(msg) = rx.recv().await {
+//!     if let Msg::DeviceInfoResponse(info) = msg {
+//!         println!("{} runs ESPHome {}", info.name, info.esphome_version);
+//!         break;
+//!     }
+//! }
+//! # Ok(()) }
+//! ```
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -14,26 +34,35 @@ use tokio::sync::broadcast;
 
 pub use pb::EspHomeMessage;
 
+/// An open API connection to an ESPHome device.
 pub struct Client {
     writer: EspHomeClientWriteStream,
     /// weak, so the channel closes as soon as the reader task dies
     events: broadcast::WeakSender<Msg>,
     closed: Closed,
+    /// The device's reply to our Hello: name, API version, server info.
     pub hello: pb::HelloResponse,
 }
 
 /// One entity as announced by ListEntities.
 #[derive(Debug, Clone)]
 pub struct Entity {
+    /// `light`, `select`, `switch`, `event`, `media_player`, ...
     pub kind: &'static str,
+    /// The key that state messages and commands use for this entity.
     pub key: u32,
+    /// Snake-case id such as `led_ring` (derived from the name when the firmware leaves it empty).
     pub object_id: String,
+    /// Human-readable name.
     pub name: String,
     /// options / effects / event types, if any
     pub choices: Vec<String>,
 }
 
 impl Client {
+    /// Connect to `addr` (`ip:port`) and say Hello. With `key` (base64 Noise PSK) the
+    /// connection is encrypted; without one it is plaintext, which only a device without a
+    /// key accepts. `client_info` is the name the device logs for this client.
     pub async fn connect(addr: &str, key: Option<&str>, client_info: &str) -> Result<Self> {
         let mut b = EspHomeClient::builder()
             .address(addr)
@@ -114,6 +143,7 @@ impl Client {
         self.closed.reason()
     }
 
+    /// Send any API message (see [`crate::proto`]). Replies arrive through [`subscribe`](Self::subscribe).
     pub async fn send(&self, msg: impl Into<Msg> + std::fmt::Debug) -> Result<()> {
         self.writer
             .try_write(msg)
@@ -121,6 +151,7 @@ impl Client {
             .map_err(|e| anyhow!("send failed ({e}); connection: {}", self.close_reason()))
     }
 
+    /// Name, MAC, ESPHome and project version, feature flags.
     pub async fn device_info(&self) -> Result<pb::DeviceInfoResponse> {
         let mut rx = self.subscribe();
         self.send(pb::DeviceInfoRequest {}).await?;
@@ -131,6 +162,7 @@ impl Client {
         .await
     }
 
+    /// Every entity the firmware exposes (lights, selects, switches, events, ...).
     pub async fn list_entities(&self) -> Result<Vec<Entity>> {
         let mut rx = self.subscribe();
         self.send(pb::ListEntitiesRequest {}).await?;
@@ -161,10 +193,13 @@ impl Client {
             })
     }
 
+    /// Ask the device to send the current state of every entity, then every change.
     pub async fn subscribe_states(&self) -> Result<()> {
         self.send(pb::SubscribeStatesRequest {}).await
     }
 
+    /// Ask the device to stream its log at `level` and above
+    /// (`SubscribeLogsResponse` messages).
     pub async fn subscribe_logs(&self, level: pb::LogLevel) -> Result<()> {
         self.send(pb::SubscribeLogsRequest {
             level: level as i32,
@@ -193,6 +228,8 @@ impl Client {
         Ok(())
     }
 
+    /// Say goodbye politely, so the device frees the connection at once instead of after a
+    /// timeout.
     pub async fn disconnect(&self) {
         let req = pb::DisconnectRequest {
             reason: pb::DisconnectReason::Unspecified as i32,
@@ -312,7 +349,8 @@ fn entity_of(msg: &Msg) -> Option<Entity> {
     }
 }
 
-/// Key of a state message, so `watch` can name it.
+/// The entity key of a state message (`None` for other messages), to look it up in
+/// [`names_by_key`].
 pub fn state_key(msg: &Msg) -> Option<u32> {
     Some(match msg {
         Msg::BinarySensorStateResponse(m) => m.key,
@@ -330,6 +368,7 @@ pub fn state_key(msg: &Msg) -> Option<u32> {
     })
 }
 
+/// `key -> "kind.object_id"` (e.g. `light.led_ring`) for naming state messages.
 pub fn names_by_key(entities: &[Entity]) -> HashMap<u32, String> {
     entities
         .iter()

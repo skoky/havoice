@@ -1,4 +1,4 @@
-//! Tiny one-file HTTP server so the device can stream a local audio file from this Mac.
+//! Tiny one-file HTTP server so the device can stream a local audio file from this computer.
 
 use std::net::{IpAddr, UdpSocket};
 use std::path::{Path, PathBuf};

@@ -141,7 +141,7 @@ async fn show_status(port: Option<String>) -> Result<()> {
     Ok(())
 }
 
-/// `http://10.0.10.76` / `http://10.0.10.76:80/` -> `10.0.10.76`
+/// `http://192.168.1.50` / `http://192.168.1.50:80/` -> `192.168.1.50`
 fn host_of(url: &str) -> Option<String> {
     let rest = url.split("://").nth(1)?;
     let host = rest.split(['/', ':']).next()?;

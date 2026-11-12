@@ -1,11 +1,11 @@
-//! High-level handle for a Home Assistant Voice PE.
+//! High-level handle for a Home Assistant Voice PE: [`VoicePe`].
 //!
 //! ```no_run
 //! # async fn demo() -> anyhow::Result<()> {
 //! use havoice::{Event, Rgb, VoicePe};
 //! let pe = VoicePe::from_env().await?;          // HAVOICE_HOST / HAVOICE_KEY or .env
 //! pe.led(Rgb(255, 100, 0), 0.8).await?;          // LED ring orange
-//! pe.say("Hello from the Mac").await?;           // say / espeak-ng -> speaker
+//! pe.say("Hello from Rust").await?;              // say / espeak-ng -> speaker
 //! let mut events = pe.events().await?;
 //! while let Some(ev) = events.next().await {
 //!     if let Event::Button(press) = ev { println!("button: {press}"); }
@@ -59,48 +59,83 @@ pub enum Event {
     Button(String),
     /// Media player changed (the dial changes `volume`).
     Media {
+        /// `idle`, `playing`, `paused`, `announcing`, ...
         state: String,
+        /// 0.0-1.0 (the firmware maps this onto part of the DAC range)
         volume: f32,
+        /// muted from the API, Home Assistant or the device
         muted: bool,
     },
+    /// A switch entity changed (e.g. the mute switch, `wake_sound`).
     Switch {
+        /// entity name
         name: String,
+        /// new state
         on: bool,
     },
+    /// A select entity changed (e.g. `wake_word_sensitivity`).
     Select {
+        /// entity name
         name: String,
+        /// selected option
         value: String,
     },
+    /// A light changed (the LED ring).
     Light {
+        /// entity name
         name: String,
+        /// on or off
         on: bool,
+        /// colour
         rgb: Rgb,
+        /// 0.0-1.0
         brightness: f32,
+        /// active effect, empty if none
         effect: String,
     },
+    /// A binary sensor changed (e.g. jack plugged, button held).
     BinarySensor {
+        /// entity name
         name: String,
+        /// new state
         on: bool,
     },
+    /// A numeric sensor reading.
     Sensor {
+        /// entity name
         name: String,
+        /// reading
         value: f32,
     },
+    /// A text or text sensor changed.
     Text {
+        /// entity name
         name: String,
+        /// new text
         value: String,
     },
+    /// A number entity changed.
     Number {
+        /// entity name
         name: String,
+        /// new value
         value: f32,
     },
     /// Any other `event` entity.
     Other {
+        /// entity name
         name: String,
+        /// event type
         kind: String,
     },
 }
 
+/// A connected Home Assistant Voice PE.
+///
+/// Opens its own API connection, so it works next to Home Assistant (ESPHome accepts
+/// several API clients). Create one with [`VoicePe::from_env`] (`HAVOICE_HOST` /
+/// `HAVOICE_KEY`, also read from `.env`) or [`VoicePe::connect`]; [`VoicePe::pair`] sets
+/// up a factory-reset device without Home Assistant.
 pub struct VoicePe {
     client: Client,
     ip: IpAddr,
@@ -192,6 +227,7 @@ impl VoicePe {
         self.ip
     }
 
+    /// Every entity the firmware exposes, as listed when connecting.
     pub fn entities(&self) -> &[Entity] {
         &self.entities
     }
@@ -212,6 +248,7 @@ impl VoicePe {
             })
     }
 
+    /// Name, MAC, ESPHome and project version, voice assistant feature flags.
     pub async fn info(&self) -> Result<pb::DeviceInfoResponse> {
         self.client.device_info().await
     }
@@ -272,6 +309,8 @@ impl VoicePe {
         .await
     }
 
+    /// Turn the LED ring off (the firmware takes it back for its own states, e.g. when
+    /// the wake word is heard).
     pub async fn led_off(&self) -> Result<()> {
         self.led_cmd(|r| {
             r.has_state = true;
@@ -349,6 +388,7 @@ impl VoicePe {
             .await
     }
 
+    /// Media player command: play, pause, stop, mute, volume up/down, ...
     pub async fn media(&self, cmd: MediaPlayerCommand) -> Result<()> {
         self.media_cmd(|r| {
             r.has_command = true;
@@ -357,7 +397,8 @@ impl VoicePe {
         .await
     }
 
-    /// Volume 0.0..=1.0.
+    /// Speaker volume 0.0..=1.0. The stock firmware maps this range onto 40-85 % of the
+    /// DAC's, so 0.0 is quiet rather than silent (use [`MediaPlayerCommand::Mute`]).
     pub async fn set_volume(&self, volume: f32) -> Result<()> {
         self.media_cmd(|r| {
             r.has_volume = true;
@@ -368,6 +409,8 @@ impl VoicePe {
 
     // ---------------------------------------------------------------- settings
 
+    /// Set the select entity whose object id contains `needle` (e.g. `wake_word_sensitivity`)
+    /// to `option`; the option is checked against the ones the firmware offers.
     pub async fn select(&self, needle: &str, option: &str) -> Result<()> {
         let e = self.entity("select", needle)?;
         if !e.choices.is_empty() && !e.choices.iter().any(|c| c == option) {
@@ -382,6 +425,7 @@ impl VoicePe {
             .await
     }
 
+    /// Turn the switch entity whose object id contains `needle` on or off.
     pub async fn switch(&self, needle: &str, on: bool) -> Result<()> {
         let e = self.entity("switch", needle)?;
         self.client
@@ -393,6 +437,7 @@ impl VoicePe {
             .await
     }
 
+    /// Set the number entity whose object id contains `needle`.
     pub async fn number(&self, needle: &str, value: f32) -> Result<()> {
         let e = self.entity("number", needle)?;
         self.client
@@ -404,6 +449,7 @@ impl VoicePe {
             .await
     }
 
+    /// Press the button entity whose object id contains `needle` (e.g. `restart`).
     pub async fn press(&self, needle: &str) -> Result<()> {
         let e = self.entity("button", needle)?;
         self.client
@@ -414,13 +460,19 @@ impl VoicePe {
             .await
     }
 
-    /// Wake words the firmware offers (e.g. "Okay Nabu", "Hey Jarvis", "Hey Mycroft").
+    /// Wake words offered by a `wake_word` select entity.
+    ///
+    /// Only older Voice PE firmware has that select; current firmware returns an empty
+    /// list here. Its models are listed by [`crate::wake_word::device_models`], and the
+    /// active ones are chosen in Home Assistant.
     pub fn wake_words(&self) -> Vec<String> {
         self.entity("select", "wake_word")
             .map(|e| e.choices.clone())
             .unwrap_or_default()
     }
 
+    /// Pick the wake word through a `wake_word` select entity - only on older firmware
+    /// that has one (see [`wake_words`](Self::wake_words)); otherwise this returns an error.
     pub async fn set_wake_word(&self, word: &str) -> Result<()> {
         self.select("wake_word", word).await
     }
@@ -440,11 +492,13 @@ impl VoicePe {
         Ok(Events { rx, names })
     }
 
+    /// Disconnect cleanly (dropping the handle also works, the device just notices later).
     pub async fn close(self) {
         self.client.disconnect().await;
     }
 }
 
+/// Named state changes from [`VoicePe::events`].
 pub struct Events {
     rx: broadcast::Receiver<Msg>,
     names: HashMap<u32, Entity>,
@@ -638,13 +692,13 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_takes_ips_names_and_ports() {
-        let a = resolve("10.0.10.79").await.unwrap();
-        assert_eq!(a.to_string(), "10.0.10.79:6053");
+        let a = resolve("192.168.1.50").await.unwrap();
+        assert_eq!(a.to_string(), "192.168.1.50:6053");
         let a = resolve("127.0.0.1:7000").await.unwrap();
         assert_eq!(a.to_string(), "127.0.0.1:7000");
         let a = resolve("localhost:7000").await.unwrap();
         assert_eq!(a.to_string(), "127.0.0.1:7000");
-        assert!(resolve("10.0.10.79:http").await.is_err());
+        assert!(resolve("192.168.1.50:http").await.is_err());
     }
 
     #[tokio::test]

@@ -7,6 +7,29 @@
 //!   models. The firmware has no way to receive a model at runtime, so a new model means
 //!   building and flashing that config (`examples/wake_word.rs install --flash`).
 //! * [`Detections`] follows the device log and yields every wake word detection.
+//!
+//! ```no_run
+//! # async fn demo() -> anyhow::Result<()> {
+//! use havoice::wake_word::{self, Detections, Manifest};
+//!
+//! // check a model before building it into firmware
+//! let manifest = Manifest::parse(&std::fs::read("alexa.json")?)?;
+//! let report = wake_word::verify(&manifest, &std::fs::read("alexa.tflite")?, None);
+//! for c in &report.checks {
+//!     println!("{} {}", if c.ok { "ok  " } else { "FAIL" }, c.what);
+//! }
+//!
+//! // watch the device hear its wake words
+//! let pe = havoice::VoicePe::from_env().await?;
+//! for m in wake_word::device_models(&pe).await? {
+//!     println!("model: {}", m.wake_word);
+//! }
+//! let mut detections = Detections::start(&pe).await?;
+//! while let Some(d) = detections.next().await {
+//!     println!("heard {} ({:?})", d.wake_word, d.average);
+//! }
+//! # Ok(()) }
+//! ```
 
 use std::collections::BTreeSet;
 use std::time::Duration;
@@ -23,32 +46,46 @@ use crate::VoicePe;
 /// microWakeWord manifest (`*.json` next to the `.tflite`), version 2.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
+    /// model family; only `micro` (microWakeWord) runs on the device
     #[serde(rename = "type")]
     pub kind: String,
+    /// the phrase, e.g. `Hey Jarvis` - also what detections report
     pub wake_word: String,
+    /// who trained it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+    /// where it comes from
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub website: Option<String>,
     /// file name of the `.tflite`, relative to the manifest
     pub model: String,
+    /// language codes the model was trained on, e.g. `["en"]`
     #[serde(default)]
     pub trained_languages: Vec<String>,
+    /// manifest format version (2)
     pub version: u32,
+    /// runtime settings for the firmware
     pub micro: MicroSettings,
 }
 
+/// The `micro` block of a [`Manifest`]: how the firmware runs the model.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MicroSettings {
+    /// detection threshold 0-1; higher = fewer false wakes, more misses
     pub probability_cutoff: f32,
+    /// audio feature step in ms (10 for every official model)
     pub feature_step_size: u32,
+    /// how many consecutive probabilities are averaged before comparing to the cutoff
     pub sliding_window_size: u32,
+    /// working memory the model needs, in bytes
     pub tensor_arena_size: u32,
+    /// oldest ESPHome that can run it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minimum_esphome_version: Option<String>,
 }
 
 impl Manifest {
+    /// Parse a manifest `.json`.
     pub fn parse(json: &[u8]) -> Result<Self> {
         serde_json::from_slice(json).context("not a microWakeWord manifest")
     }
@@ -80,14 +117,21 @@ impl Manifest {
 /// What the device cares about in a `.tflite`.
 #[derive(Debug, Clone)]
 pub struct TfliteInfo {
+    /// TFLite schema version (the device needs 3)
     pub schema_version: u32,
     /// builtin operator codes, by name where known
     pub operators: Vec<String>,
+    /// operators the device's interpreter doesn't register (must be empty)
     pub unsupported: Vec<String>,
+    /// main input shape; the device needs `[1, stride, 40]`
     pub input_shape: Vec<i32>,
+    /// main input type; the device needs `int8`
     pub input_type: &'static str,
+    /// output shape; the device needs `[1, 1]`
     pub output_shape: Vec<i32>,
+    /// output type; the device needs `uint8`
     pub output_type: &'static str,
+    /// number of subgraphs (streaming models have an extra init graph)
     pub subgraphs: usize,
 }
 
@@ -299,17 +343,24 @@ pub fn inspect_tflite(bytes: &[u8]) -> Result<TfliteInfo> {
 /// One line of a verification report.
 #[derive(Debug, Clone)]
 pub struct Check {
+    /// the check passed
     pub ok: bool,
     /// a warning doesn't block installing
     pub warning: bool,
+    /// what was checked, with the value found
     pub what: String,
 }
 
+/// Result of [`verify`].
 #[derive(Debug, Clone)]
 pub struct Report {
+    /// every check, in order
     pub checks: Vec<Check>,
+    /// what was read from the `.tflite`, if it could be read at all
     pub tflite: Option<TfliteInfo>,
+    /// SHA-256 of the `.tflite`, hex
     pub sha256: String,
+    /// size of the `.tflite` in bytes
     pub size: usize,
 }
 
@@ -450,6 +501,7 @@ fn version_le(a: &str, b: &str) -> bool {
     parse(a) <= parse(b)
 }
 
+/// SHA-256 of `bytes` as lowercase hex.
 pub fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::Digest as _;
     sha2::Sha256::digest(bytes)
@@ -463,8 +515,9 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 /// Where the generated firmware comes from and what it keeps.
 #[derive(Debug, Clone)]
 pub struct Firmware {
-    /// device hostname without `.local`, e.g. `home-assistant-voice-0ae0b7`
+    /// device hostname without `.local`, e.g. `home-assistant-voice-0a1b2c`
     pub name: String,
+    /// name shown in Home Assistant, e.g. `Home Assistant Voice 0a1b2c`
     pub friendly_name: String,
     /// stock config, from the device's mDNS `package_import_url`
     pub package_url: String,
@@ -545,7 +598,9 @@ pub fn model_id(wake_word: &str) -> String {
 /// A wake word model compiled into the running firmware.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeviceModel {
+    /// the phrase, e.g. `Okay Nabu` (`Stop` is the built-in stop-timer model)
     pub wake_word: String,
+    /// detection threshold in effect (shifted by the sensitivity setting)
     pub probability_cutoff: Option<f32>,
 }
 
@@ -607,9 +662,11 @@ pub async fn device_models(pe: &VoicePe) -> Result<Vec<DeviceModel>> {
 /// One detection reported by the device.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Detection {
+    /// the phrase the model is for
     pub wake_word: String,
     /// sliding-window average probability, 0-1 (`None` for a VAD rejection)
     pub average: Option<f32>,
+    /// peak probability in the window, 0-1
     pub max: Option<f32>,
     /// the model fired but voice activity detection said nobody was speaking
     pub vad_rejected: bool,
@@ -652,6 +709,7 @@ pub struct Detections {
 }
 
 impl Detections {
+    /// Start following the device log on `pe`'s connection.
     pub async fn start(pe: &VoicePe) -> Result<Self> {
         let rx = pe.client().subscribe();
         pe.client()
@@ -740,8 +798,8 @@ mod tests {
     #[test]
     fn yaml_keeps_stock_and_adds_models() {
         let y = firmware_yaml(&Firmware {
-            name: "home-assistant-voice-0ae0b7".into(),
-            friendly_name: "Home Assistant Voice 0ae0b7".into(),
+            name: "home-assistant-voice-0a1b2c".into(),
+            friendly_name: "Home Assistant Voice 0a1b2c".into(),
             package_url: "github://esphome/home-assistant-voice-pe/home-assistant-voice.yaml"
                 .into(),
             models: vec![("alexa".into(), "models/alexa.json".into())],

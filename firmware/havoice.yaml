@@ -3,8 +3,8 @@
 #   esphome run firmware/havoice.yaml --device /dev/cu.usbmodem3101
 # NOT flashed yet. If you flash this, give HA the same api key (or re-adopt the device).
 substitutions:
-  name: home-assistant-voice-0ae0b7
-  friendly_name: Home Assistant Voice 0ae0b7
+  name: home-assistant-voice-0a1b2c
+  friendly_name: Home Assistant Voice 0a1b2c
 
 packages:
   Nabu Casa.Home Assistant Voice PE: github://esphome/home-assistant-voice-pe/home-assistant-voice.yaml

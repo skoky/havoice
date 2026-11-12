@@ -41,6 +41,9 @@ fn pick_port(ports: Vec<(String, bool)>) -> Option<String> {
     candidates.into_iter().next().map(|(n, _)| n)
 }
 
+/// Print the device log from `port` to stdout until the port closes (blocking).
+/// `grep` keeps only matching lines, `raw` keeps ANSI colours, `save` also appends the
+/// plain lines to a file. Opening the port does not reset the chip.
 pub fn tail(
     port: &str,
     grep: Option<&Regex>,

@@ -3,6 +3,22 @@
 //! Gives a freshly reset device its Wi-Fi credentials without Home Assistant, a phone or
 //! Bluetooth - the same thing ESP Web Tools does in the browser. The port also carries
 //! the device log, so packets are fished out of the byte stream by their `IMPROV` header.
+//!
+//! The calls block on serial I/O; from async code, run them in
+//! `tokio::task::spawn_blocking`.
+//!
+//! ```no_run
+//! use std::time::Duration;
+//! use havoice::improv::Improv;
+//!
+//! # fn demo() -> anyhow::Result<()> {
+//! let mut improv = Improv::open(&havoice::serial::default_port()?)?;
+//! println!("{:?}", improv.state()?);
+//! if let Some(url) = improv.provision("MyNetwork", "secret", Duration::from_secs(60))? {
+//!     println!("device is on Wi-Fi at {url}");
+//! }
+//! # Ok(()) }
+//! ```
 
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
@@ -16,13 +32,17 @@ const VERSION: u8 = 1;
 /// Provisioning state reported by the device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
+    /// Improv is off (e.g. the device is already on Wi-Fi and stopped offering it)
     Stopped,
+    /// waiting for a button press before accepting credentials
     AwaitingAuthorization,
     /// ready to accept credentials
     Ready,
+    /// credentials received, joining the network
     Provisioning,
     /// connected to Wi-Fi
     Provisioned,
+    /// a state code this crate doesn't know
     Unknown(u8),
 }
 
@@ -42,8 +62,11 @@ impl From<u8> for State {
 /// A Wi-Fi network the device can see.
 #[derive(Debug, Clone)]
 pub struct Network {
+    /// network name
     pub ssid: String,
+    /// signal strength in dBm (closer to 0 is stronger)
     pub rssi: i32,
+    /// needs a password
     pub secured: bool,
 }
 
@@ -59,6 +82,7 @@ const CMD_STATE: u8 = 0x02;
 const CMD_INFO: u8 = 0x03;
 const CMD_SCAN: u8 = 0x04;
 
+/// An Improv Serial session on the device's USB port.
 pub struct Improv {
     port: Box<dyn SerialPort>,
     buf: Vec<u8>,
@@ -129,7 +153,7 @@ impl Improv {
     }
 
     /// Send Wi-Fi credentials and wait until the device has joined.
-    /// Returns the device URL (e.g. `http://10.0.10.76`), if it reports one.
+    /// Returns the device URL (e.g. `http://192.168.1.50`), if it reports one.
     pub fn provision(
         &mut self,
         ssid: &str,
@@ -286,9 +310,9 @@ mod tests {
 
     #[test]
     fn packets_are_found_between_log_lines() {
-        let mut result = vec![CMD_STATE, 0];
-        result.push(17);
-        result.extend(b"http://10.0.10.76");
+        let url = b"http://192.168.1.50";
+        let mut result = vec![CMD_STATE, 0, url.len() as u8];
+        result.extend(url);
         result[1] = (result.len() - 2) as u8;
         let mut buf = b"[D][wifi]: noise IMPRO\n".to_vec();
         buf.extend(&frame(0x01, &[0x04])[..11]); // drop the newline
@@ -299,7 +323,7 @@ mod tests {
             take_packet(&mut buf),
             Some(Packet::Result {
                 command: CMD_STATE,
-                strings: vec!["http://10.0.10.76".into()]
+                strings: vec!["http://192.168.1.50".into()]
             })
         );
         assert_eq!(take_packet(&mut buf), None);

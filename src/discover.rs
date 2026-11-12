@@ -8,15 +8,23 @@ use anyhow::Result;
 use esphome_client::discovery;
 use mdns_sd::{HostnameResolutionEvent, ServiceDaemon};
 
+/// An ESPHome device announced on the LAN.
 #[derive(Debug, Clone)]
 pub struct Found {
+    /// Device name, e.g. `home-assistant-voice-0a1b2c`.
     pub name: String,
+    /// mDNS hostname, e.g. `home-assistant-voice-0a1b2c.local`.
     pub host: String,
+    /// API port (6053).
     pub port: u16,
+    /// Whether the API needs a key (Noise encryption).
     pub encrypted: bool,
+    /// TXT record: `version`, `mac`, `friendly_name`, `project_version`,
+    /// `package_import_url`, ...
     pub txt: HashMap<String, String>,
 }
 
+/// Every ESPHome device that answers within `wait` (3 s is plenty on a LAN).
 pub async fn discover(wait: Duration) -> Result<Vec<Found>> {
     let mut stream = discovery::Client::default().discover()?;
     let mut found: BTreeMap<String, Found> = BTreeMap::new();
@@ -41,7 +49,7 @@ pub async fn discover(wait: Duration) -> Result<Vec<Found>> {
     Ok(found.into_values().collect())
 }
 
-/// IPv4 address of a `.local` name (e.g. `home-assistant-voice-0ae0b7.local`), asked over
+/// IPv4 address of a `.local` name (e.g. `home-assistant-voice-0a1b2c.local`), asked over
 /// mDNS directly. macOS's resolver sometimes has only the device's IPv6 link-local address
 /// cached and answers with that alone; this asks the device itself.
 pub async fn resolve_v4(host: &str, wait: Duration) -> Result<Option<Ipv4Addr>> {

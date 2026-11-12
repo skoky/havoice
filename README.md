@@ -1,222 +1,223 @@
 # havoice
 
-Rust library (+ CLI and examples) for the **Home Assistant Voice Preview Edition** (Voice PE), driven from a
-Mac or a Linux machine on the same LAN. Developed and tested on macOS; see [Linux / Ubuntu](#linux--ubuntu)
-for what differs there.
+[![crates.io](https://img.shields.io/crates/v/havoice.svg)](https://crates.io/crates/havoice)
+[![docs.rs](https://img.shields.io/docsrs/havoice)](https://docs.rs/havoice)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Drive a **[Home Assistant Voice Preview Edition](https://www.home-assistant.io/voice-pe/)** (Voice PE)
+from Rust - a library, a command-line tool and a set of examples. It talks to the device's ESPHome native API
+directly, so it works **next to Home Assistant or without it**.
+
+* LED ring: colours, fades, the firmware's effects
+* Speaker: internet radio and other MP3/FLAC URLs, local files, audio generated in Rust, speech in a voice you pick
+* Volume, mute, and every entity the firmware exposes (selects, switches, numbers, buttons)
+* Events: button presses, the dial, the mute switch, media player state
+* Wake words: list the models on the device, watch it detect them, check and build new
+  [microWakeWord](https://github.com/kahrendt/microWakeWord) models into its firmware
+* Setup without Home Assistant: Wi-Fi over the USB cable (Improv Serial) and a fresh API key
 
 ```rust
 use havoice::{Event, Rgb, VoicePe};
 
-let pe = VoicePe::from_env().await?;            // HAVOICE_HOST (or mDNS) + HAVOICE_KEY, reads .env
-pe.led(Rgb(255, 100, 0), 0.8).await?;            // LED ring
-pe.say("The laundry is done").await?;            // macOS `say` / Linux `espeak-ng` -> device speaker
-pe.set_wake_word("Hey Jarvis").await?;
-let mut events = pe.events().await?;
-while let Some(ev) = events.next().await {
-    if let Event::Button(press) = ev { println!("{press}"); }   // double_press, triple_press, long_press (single press stays with the voice assistant)
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let pe = VoicePe::from_env().await?;   // HAVOICE_HOST (or mDNS) + HAVOICE_KEY, also read from .env
+
+    pe.led(Rgb(255, 100, 0), 0.8).await?;
+    pe.say("The laundry is done").await?;  // macOS `say` / Linux `espeak-ng`, sent to the device as FLAC
+    pe.set_volume(0.4).await?;
+
+    let mut events = pe.events().await?;
+    while let Some(ev) = events.next().await {
+        if let Event::Button(press) = ev {
+            println!("{press}");           // double_press, triple_press, long_press
+        }
+    }
+    Ok(())
 }
 ```
 
-## The device (as seen from here)
+## Install
 
-| | |
+```toml
+[dependencies]
+havoice = { version = "0.1", default-features = false }   # the library only
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+```
+
+The `havoice` command-line tool (the default `cli` feature):
+
+```bash
+cargo install havoice
+```
+
+To run the examples, clone the repository and copy `.env.example` to `.env`.
+
+**Linux** needs `libudev` for the serial port and, for speech, `espeak-ng`:
+
+```bash
+sudo apt install build-essential pkg-config libudev-dev cmake espeak-ng
+```
+
+## Connecting
+
+Two settings, from the environment or a `.env` file (variables already set in the shell win):
+
+| variable | |
 |---|---|
-| SoC | ESP32-S3 (16 MB flash, PSRAM) + XMOS XU316 audio DSP (fw 1.3.1, I²C `0x42`) |
-| Firmware | ESPHome 2026.6.0, project *Nabu Casa.Home Assistant Voice PE* 26.9.0 |
-| USB-C | ESP32-S3 native USB serial/JTAG → `/dev/cu.usbmodem3101` on macOS, `/dev/ttyACM0` on Linux (logs, Improv Wi-Fi setup, flashing) |
-| Wi-Fi | `home-assistant-voice-0ae0b7.local` / `10.0.10.79` (DHCP - reserve it on the router), MAC `20:F8:3B:0A:E0:B7` |
-| API | ESPHome native API on `:6053`, **Noise encrypted** (adopted by HA 2026.11.1 @ `10.0.10.112`) |
-| OTA | `:3232` |
-| I/O | 12× WS2812 LED ring (GRB), center button, rotary dial, mute switch, speaker + 3.5 mm out, 2 mics |
-| Wake words | Okay Nabu, Hey Jarvis, Hey Mycroft (+ "Stop"), on-device microWakeWord + VAD |
-| Media | speaker media player, HTTP/file sources, **Sendspin** (synced multi-room) source |
-| Codecs | **FLAC and MP3 only** - the firmware has no WAV decoder, so generated audio and `say` go out as FLAC |
-| Expansion | Grove port (I²C SCL/SDA; +5 V gated by GPIO46), internal headers IO1/2/38/39/40/47/48, RGBIN/RGBOUT for extra LEDs, UART0 unused |
+| `HAVOICE_HOST` | IP or `.local` name of the device; empty = the first Voice PE found via mDNS |
+| `HAVOICE_KEY` | the API encryption key (base64) |
 
-Sources: Nabu Casa support pages (*Customizing the device*, *internal GPIO pins*, *Grove port*,
-*scripts and automations*) and the device's own boot log (`logs/boot.log`).
+The stock firmware encrypts its API with a key Home Assistant generated when it adopted the device. It is
+**not** your Home Assistant password. To get it:
 
-## Build
-
-macOS (Xcode command line tools + [rustup](https://rustup.rs)):
-
-```bash
-cargo build --release
-cp .env.example .env   # then fill HAVOICE_KEY
-```
-
-Ubuntu / Debian: the `serialport` crate links `libudev`, and the HTTPS stack used by the `radio`
-example compiles some C, so install these first (then the same two commands):
-
-```bash
-sudo apt install build-essential pkg-config libudev-dev cmake
-sudo apt install espeak-ng      # speech (say / speak / tour / button_actions)
-```
-
-`.env` holds `HAVOICE_HOST` (IP or `.local` name; empty = first Voice PE found via mDNS) and `HAVOICE_KEY`.
-Variables already set in the shell win over `.env`, so `HAVOICE_HOST=10.0.10.80 cargo run --example radio`
-targets another device for one run.
-
-## Examples
-
-| example | needs | shows |
-|---|---|---|
-| `cargo run --example discover` | – | mDNS discovery + TXT records |
-| `cargo run --example tour` | key | guided tour: info, entities, state snapshot, LED colours/fade/effects, speech, button/dial/mute events |
-| `cargo run --example led_show [-- ff6600\|Rainbow\|off]` | key | colour wheel animation, one colour, or a firmware effect |
-| `cargo run --example speak -- "text"` / `-- --file x.mp3` | key | speech (`say` / `espeak-ng`) or a local file on the speaker (as announcement) |
-| `cargo run --example synth -- [chime\|arp\|alarm\|sweep\|waves]` | key | sounds generated in Rust (`havoice::Pcm`), FLAC-encoded in-process, LED colour per sound |
-| `cargo run --example radio -- [--volume 30] [--say \| --voice Daniel\|cs] [jazz]` | key | internet radio: presets, or other words search radio-browser.info (MP3); now-playing titles; station names spoken in a chosen voice; type `+` / `-` / `v 40` for volume, `n` / `p` / a number for stations, `q` to quit; on the device double press = next, triple = previous, long = stop |
-| `cargo run --example button_actions` | key | desk control pad: double = says the time, triple = says the battery level, long = LED colour on/off |
-| `cargo run --example pair -- --status` | USB | read-only: Wi-Fi state over USB (Improv) and whether the device has an API key |
-| `cargo run --example pair [-- --wifi SSID]` | USB | no-HA setup of a factory-reset device: Wi-Fi over USB, then a fresh key into `.env` (not yet run on a real device) |
-| `cargo run --example wake_word -- list` | key | wake word models in the running firmware, stored locally, and in ESPHome's online catalogue |
-| `cargo run --example wake_word -- verify <src>` | – | download (catalogue name / URL) or read a local `.json`/`.tflite` and check it like the device does |
-| `cargo run --example wake_word -- install <src> [--flash]` | key | verify + store in `firmware/models/`, write the firmware YAML; `--flash` builds it and uploads over Wi-Fi |
-| `cargo run --example wake_word -- listen` | key | print every wake word detection (with probabilities) from the device log |
-
-### Wake word models
-
-The firmware compiles its wake word models in; ESPHome has no way to send one at runtime. So `wake_word install`
-builds **custom firmware**: the stock Voice PE config (as the device announces it over mDNS) plus your models,
-with the same device name and API key, so Home Assistant and havoice keep working. Before anything is stored, a
-model is checked the way `micro_wake_word` checks it when loading: TFLite schema 3, only the 20 operators the
-firmware's interpreter has, input int8 `[1, stride, 40]`, output uint8 `[1, 1]`, sane manifest values, ESPHome
-version. A bare `.tflite` needs `--wake-word "..."` (plus optional `--language`, `--cutoff`, `--window`, `--arena`).
-
-`--flash` needs the ESPHome CLI (`pip install esphome`; the example also finds `.venv-esphome/bin/esphome` or
-`HAVOICE_ESPHOME`). The first build downloads ~1 GB of toolchain and takes 10-20 minutes. Extra models are switched
-on whenever an API client connects; in Home Assistant you can still pick wake words on the device page. Without a
-stored network the firmware falls back to a hotspot whose password is in `firmware/secrets.yaml`.
-Back to stock firmware: <https://esphome.github.io/home-assistant-voice-pe/> (or `wake_word remove <id> --flash`).
-
-Only microWakeWord models run on the device - an openWakeWord/ONNX model (like `ahoj_hugo.onnx`) has to be
-retrained with microWakeWord first.
-
-### Voice and volume from Rust
-
-Speech runs a text-to-speech program on this computer (macOS `say`, Linux `espeak-ng`) and sends the result to
-the device as FLAC. The voice is chosen per call, or once for everything:
-
-```rust
-use havoice::tts;
-
-pe.say("Default voice").await?;                          // HAVOICE_TTS_VOICE, else the system voice
-pe.say_voice("Hello from Daniel", "Daniel").await?;      // a voice by name
-let cz = tts::find_voice("cs").await?;                   // ... or the first voice of a language
-pe.say_voice("Dobrý den", &cz.name).await?;
-for v in tts::voices().await? { println!("{} {}", v.name, v.language); }
-
-pe.set_volume(0.3).await?;                               // speaker volume 0.0 - 1.0
-```
-
-`cargo run -- voices [cs]` lists what's installed. Speech program: `HAVOICE_TTS` (`say`, `espeak-ng`, `espeak`);
-default voice: `HAVOICE_TTS_VOICE` (`Zuzana`, `cs`, `en-us`, …). On macOS, more voices (Czech Zuzana among them)
-are added under System Settings → Accessibility → Spoken Content → System voice → Manage Voices.
-
-## Library API (`havoice`)
-
-* `VoicePe`: `connect` / `from_env`, `info`, `entities`, `led` / `led_fade` / `led_effect` / `led_off`,
-  `play_url` / `play_file` / `play_pcm` / `say` / `say_voice`, `media` / `set_volume`, `select` / `switch` / `number` / `press`,
-  `wake_words` / `set_wake_word` / `set_wake_sound`, `events() -> Events` (typed `Event`s), `client()` for raw access.
-* `api::Client`: lower-level client (subscribe to every raw message, send any `proto` message).
-* `tts`: `voices`, `find_voice`, `render` (text → `Pcm`) with `say` / `espeak-ng`.
-* `wake_word`: `verify` / `inspect_tflite` (model checks), `Manifest`, `firmware_yaml`, `device_models`,
-  `Detections` (live detections from the device log).
-* `discover`, `serial`, `serve`: mDNS, USB log, local file server.
-* `proto`: re-export of every ESPHome protobuf message (API 1.16).
-
-## CLI
-
-| command | needs | what |
-|---|---|---|
-| `havoice discover` | – | mDNS scan for ESPHome devices |
-| `havoice serial [--port P] [--grep wake] [--save f]` | USB | tail the ESPHome log (opening the port does **not** reset the chip); `--port` or `HAVOICE_SERIAL`, default: the Espressif USB port (`/dev/cu.usbmodem*` / `/dev/ttyACM*`) |
-| `havoice info` | key | device info |
-| `havoice entities` | key | every entity, with select options / light effects / event types |
-| `havoice watch` | key | live state stream: button events, dial/volume, mute, LEDs, media player |
-| `havoice logs [--level debug]` | key | device log over Wi-Fi |
-| `havoice led ff6600` / `led Rainbow` / `led off` | key | LED ring: colour, effect, off |
-| `havoice say [--voice Daniel\|cs] "hello there"` | key | speak (macOS `say`, Linux `espeak-ng`), optionally in a given voice or language |
-| `havoice voices [cs]` | – | text-to-speech voices on this computer, optionally one language |
-| `havoice play song.mp3 [--announce] [--volume .4]` | key | streams a local file from this Mac (built-in HTTP server) or a URL |
-| `havoice media pause\|stop\|volume 0.3 …` | key | media player |
-| `havoice select wake_word "Hey Jarvis"` | key | any select |
-| `havoice switch wake_sound off` | key | any switch |
-| `havoice number <entity> <value>` / `press <entity>` | key | numbers, buttons |
-
-Our client connects **alongside** Home Assistant (ESPHome allows several API clients), so nothing is taken away from HA.
-
-## Linux / Ubuntu
-
-The library, CLI and examples are plain Rust and build on Linux (packages under [Build](#build)). They have only
-been run on macOS so far, so treat this section as the expected differences rather than a tested recipe.
-
-| | macOS | Linux / Ubuntu |
-|---|---|---|
-| USB port | `/dev/cu.usbmodem*` | `/dev/ttyACM*` - both found automatically by Espressif's USB vendor id; override with `--port` or `HAVOICE_SERIAL` |
-| USB access | works out of the box | add yourself to `dialout`: `sudo usermod -aG dialout $USER`, then log out and in |
-| Speech (`say`, `speak`, `tour`, `button_actions`) | built-in `say` | `espeak-ng` (`sudo apt install espeak-ng`); a missing program is reported with that hint, and `button_actions` keeps running |
-| Battery in `button_actions` | `pmset` | `/sys/class/power_supply/*/capacity` (desktops without a battery say so) |
-| `.local` names | built in | Ubuntu desktop resolves them via Avahi; on a server install `apt install avahi-daemon libnss-mdns`. If the system can't resolve a `.local` name, havoice asks the device over mDNS itself |
-| Firewall | System Settings → Privacy & Security → **Local Network** must allow your terminal app, or connections fail with *No route to host* | Ubuntu's `ufw` is off by default. If it's on, allow mDNS (`sudo ufw allow 5353/udp`) and let the device fetch from the built-in file server on a random port (`sudo ufw allow from 10.0.10.79`) - needed by `play <file>`, `synth`, `say` |
-
-On Ubuntu, **ModemManager** may probe a newly plugged `/dev/ttyACM0` and send it modem commands. If the USB log
-shows garbage or the port is busy right after plugging in, stop it (`sudo systemctl stop ModemManager`) or add a
-udev rule setting `ENV{ID_MM_DEVICE_IGNORE}="1"` for the device.
-
-## Getting the API key
-
-The stock firmware requires the Noise PSK that HA generated when it adopted the device. It is **not** your HA password.
-
-* **HA OS / Supervised**: open the *Terminal & SSH* add-on and run
+* **HA OS / Supervised** - in the *Terminal & SSH* add-on:
   ```bash
   jq -r '.data.entries[] | select(.domain=="esphome") | "\(.title)  \(.data.host)  \(.data.noise_psk)"' /config/.storage/core.config_entries
   ```
-* **HA Container**: same file in your mounted config dir.
-* **ESPHome Device Builder add-on**: after *Take control*, the device YAML has `api: encryption: key:`.
-* **Last resort**: flash `firmware/havoice.yaml` over USB with your own key and re-enter it in HA.
+* **HA Container** - the same file in your config directory, or run the command inside the container
+  (`docker exec -it homeassistant ...` / `podman exec -it homeassistant ...`).
+* **ESPHome Device Builder** - after *Take control*, the device YAML has `api: encryption: key:`.
+* **No Home Assistant** - factory-reset the device (hold the centre button ~22 s until the red circle
+  completes) and let `cargo run --example pair -- --wifi "YourSSID"` give it Wi-Fi over USB and a new key.
 
-Put it in `.env` as `HAVOICE_KEY=...`. A wrong key fails fast with `Handshake MAC failure`.
+A wrong key fails fast with a handshake error. ESPHome accepts several API clients at once, so Home Assistant
+keeps working while havoice is connected.
 
-## Layout
+## Examples
+
+| example | shows |
+|---|---|
+| `cargo run --example tour` | guided tour: info, entities, LED colours/fades/effects, speech, button/dial/mute events |
+| `cargo run --example discover` | mDNS discovery of ESPHome devices (no key needed) |
+| `cargo run --example led_show [-- ff6600\|Rainbow\|off]` | colour wheel animation, one colour, or a firmware effect |
+| `cargo run --example speak -- "text"` / `-- --file x.mp3` | speech or a local file, as an announcement |
+| `cargo run --example synth -- [chime\|arp\|alarm\|sweep\|waves]` | sounds generated in Rust with `havoice::Pcm` |
+| `cargo run --example radio -- [--volume 30] [--voice Daniel\|cs] [jazz]` | internet radio: presets or a [radio-browser.info](https://www.radio-browser.info) search, now-playing titles, spoken station names; `+` / `-` / `v 40` for volume, `n` / `p` / a number for stations, `q` to quit; double press = next, triple = previous, long press = stop |
+| `cargo run --example button_actions` | desk control pad: double press says the time, triple the battery level, long toggles the LED |
+| `cargo run --example pair -- --status` | read-only: Wi-Fi state over USB and whether the device has a key |
+| `cargo run --example pair [-- --wifi SSID]` | set up a factory-reset device without Home Assistant (not yet tried on real hardware) |
+| `cargo run --example wake_word -- list` | wake word models on the device, stored locally, and in ESPHome's online catalogue |
+| `cargo run --example wake_word -- verify <src>` | check a model the way the device does (catalogue name, URL, or local file) |
+| `cargo run --example wake_word -- install <src> [--flash]` | build verified models into the firmware; `--flash` uploads it over Wi-Fi |
+| `cargo run --example wake_word -- listen` | print every wake word detection with its probabilities |
+
+## Command-line tool
+
+| command | what |
+|---|---|
+| `havoice discover` | mDNS scan for ESPHome devices |
+| `havoice info` / `entities` | device info / every entity with its options, effects and event types |
+| `havoice watch` | live state stream: buttons, dial, mute, LEDs, media player |
+| `havoice logs [--level debug]` | device log over Wi-Fi |
+| `havoice serial [--port P] [--grep wake]` | device log over USB (opening the port does not reset the chip) |
+| `havoice led ff6600` / `led Rainbow` / `led off` | LED ring |
+| `havoice say [--voice Daniel\|cs] "hello"` / `havoice voices [cs]` | speech, and the voices installed here |
+| `havoice play song.mp3 [--announce] [--volume .4]` | a URL, or a local file served from this computer |
+| `havoice media pause\|stop\|volume 0.3 …` | media player |
+| `havoice select …` / `switch …` / `number …` / `press restart` | any entity |
+
+## Audio, speech and volume
+
+The stock firmware decodes **FLAC and MP3 only** - no WAV, AAC, Ogg or HLS. Generated audio and speech are
+encoded to FLAC in-process (pure Rust) and served to the device by a one-file HTTP server, so the device must be
+able to reach this computer.
+
+```rust
+use havoice::{audio::{envelope, sine}, tts, Pcm};
+
+let mut beep = Pcm::new(22_050);
+beep.push(1.0, |t| 0.5 * sine(440.0, t) * envelope(t, 1.0, 0.02, 0.3));
+pe.play_pcm(&beep, true).await?;                     // true = announcement, ducks music
+
+pe.say_voice("Hello", "Daniel").await?;              // a voice by name
+let czech = tts::find_voice("cs").await?;            // or the first voice of a language
+pe.say_voice("Dobrý den", &czech.name).await?;
+
+pe.set_volume(0.3).await?;
+```
+
+Speech uses `say` on macOS and `espeak-ng` elsewhere; `HAVOICE_TTS` picks another program and
+`HAVOICE_TTS_VOICE` a default voice. The firmware maps volume 0-100 % onto 40-85 % of its DAC range, so 0 % is
+quiet, not silent - use mute for silence. The built-in speaker is meant for voice; for music, connect a powered
+speaker to the 3.5 mm jack.
+
+## Wake word models
+
+The stock firmware ships with *Okay Nabu*, *Hey Jarvis* and *Hey Mycroft* (plus *Stop* for timers), and
+`wake_word::Detections` reports every detection from the device log.
+
+ESPHome compiles wake word models into the firmware - it cannot receive one at runtime. So
+`wake_word install` builds **custom firmware**: the stock Voice PE configuration plus your models, with the same
+device name and API key, so Home Assistant and havoice keep working. Before anything is stored, each model is
+checked the way the firmware checks it when loading: TFLite schema 3, only the 20 operators its interpreter
+has, input int8 `[1, stride, 40]`, output uint8 `[1, 1]`, sensible manifest values, ESPHome version.
+
+* Sources: an [ESPHome catalogue](https://github.com/esphome/micro-wake-word-models) name (`alexa`,
+  `hey_home_assistant`, ...), an http(s) URL of a manifest `.json` or a `.tflite`, or a local file. A bare
+  `.tflite` needs `--wake-word "..."` (optionally `--language`, `--cutoff`, `--window`, `--arena`).
+* `--flash` needs the ESPHome CLI (`pip install esphome`, or set `HAVOICE_ESPHOME`). The first build downloads
+  about 1 GB of toolchain and takes 10-20 minutes; later builds take a minute. The upload goes over Wi-Fi.
+* Added models switch on whenever an API client connects; Home Assistant can still choose wake words as usual.
+* If the device can't reach its saved Wi-Fi network, the custom firmware opens a fallback hotspot; its password is
+  in `firmware/secrets.yaml`.
+* Back to stock firmware: `wake_word remove <id> --flash`, or the
+  [Voice PE web flasher](https://esphome.github.io/home-assistant-voice-pe/).
+
+Only microWakeWord models run on the device. openWakeWord / ONNX models have to be retrained with microWakeWord.
+
+## Linux and macOS
+
+Developed and tested on macOS; it builds on Linux, where these differ:
+
+| | macOS | Linux |
+|---|---|---|
+| USB port | `/dev/cu.usbmodem*` | `/dev/ttyACM*` - both found automatically by Espressif's USB vendor id; override with `--port` / `HAVOICE_SERIAL` |
+| USB access | works | `sudo usermod -aG dialout $USER`, then log in again |
+| Speech | `say` | `espeak-ng` |
+| `.local` names | built in | Avahi (`avahi-daemon libnss-mdns` on servers); havoice falls back to its own mDNS lookup |
+| Network access | System Settings → Privacy & Security → **Local Network** must allow your terminal app | if `ufw` is on, allow mDNS (`5353/udp`) and connections from the device (it fetches audio from this computer) |
+
+On Ubuntu, ModemManager may grab a newly plugged `/dev/ttyACM0`; stop it or add a udev rule with
+`ENV{ID_MM_DEVICE_IGNORE}="1"`.
+
+## Troubleshooting
+
+* **`No route to host` while `ping` works** - macOS is blocking your terminal app from the local network
+  (`ping` and `nc` are exempt, so they prove nothing). Allow it under Privacy & Security → Local Network.
+* **A `.local` name doesn't resolve** - use the IP, and give the device a fixed DHCP lease on the router.
+* **Plays nothing, log shows `Failed to create socket`** - the device ran out of network sockets; restart it
+  (`havoice press restart`, or unplug it).
+* **No log over USB, no Improv reply, not on Wi-Fi** - the chip is probably sitting in its USB bootloader. Reset it
+  from the inside: `esptool --port <port> --after watchdog-reset read-mac` (a reset via the RTS line can put it
+  straight back into the bootloader).
+* **`Connection reset` / timeouts** - the device sleeps its Wi-Fi between packets; havoice retries a few times.
+  Repeated failures usually mean it dropped off the network (see above).
+
+## How it works
+
+Transport, the Noise handshake and the protobuf messages come from
+[`esphome-client`](https://crates.io/crates/esphome-client) (API 1.16). The tests run havoice against the
+*device* side of [`esphome-native-api`](https://crates.io/crates/esphome-native-api), so two independent
+implementations have to agree; the pairing tests use a hand-written plaintext device.
 
 ```
-src/lib.rs              crate root, re-exports
-src/device.rs           VoicePe high-level API + typed Events
-src/api.rs              connection over esphome-client: reader task, broadcast, entities, error hints
-src/discover.rs         mDNS (esphome_client::discovery) + IPv4 lookup of .local names
-src/serial.rs           USB log tail
-src/improv.rs           Improv Wi-Fi setup over the USB serial port
-src/audio.rs            Pcm samples, FLAC encoding, WAV reading
-src/serve.rs            one-file HTTP server for play_file / say
-src/tts.rs              text-to-speech: say / espeak-ng, voice list and lookup
-src/wake_word.rs        microWakeWord model checks (tflite reader), firmware YAML, detections
-src/main.rs             `havoice` CLI on top of the library
-examples/               runnable demos (see above)
-tests/fake_device.rs    end-to-end tests against a fake encrypted device (esphome-native-api device side)
-tests/pairing.rs        pairing a key-less fake device
-firmware/havoice.yaml   custom firmware stub (not flashed)
-firmware/models/        wake word models stored by `wake_word install` (gitignored)
-firmware/voice-pe-wake-words.yaml  generated by `wake_word install` (gitignored)
+src/device.rs      VoicePe: the high-level API and typed events
+src/api.rs         connection, message fan-out, entities, error hints
+src/audio.rs       PCM, FLAC encoding, WAV reading
+src/tts.rs         say / espeak-ng, voices
+src/wake_word.rs   model checks (a small TFLite reader), firmware YAML, detections
+src/improv.rs      Wi-Fi setup over USB (Improv Serial)
+src/discover.rs    mDNS
+src/serial.rs      USB log
+src/serve.rs       one-file HTTP server for local audio
+src/main.rs        the havoice CLI
+examples/          the examples above
 ```
 
-Transport, Noise NNpsk0 handshake and protobuf messages come from the
-[`esphome-client`](https://crates.io/crates/esphome-client) crate (pinned to API 1.16). We skip its built-in
-connection setup and send Hello ourselves to keep the `HelloResponse`, and skip messages newer than its proto set.
-The tests run our client against the *device* side of `esphome-native-api`, so two independent implementations
-have to agree.
+Not affiliated with Nabu Casa, Home Assistant or ESPHome.
 
-## Ideas to build next
+## License
 
-1. **Status light for the Mac**: drive the ring from scripts, e.g. a Claude Code hook that turns it blue while
-   waiting for input, red on failed builds, green when CI passes.
-2. **Desk macro pad**: map `watch` events (double/triple/long press, dial) to Mac actions such as
-   play/pause, Zoom mute, or volume.
-3. **Mac → device speech**: `say -o x.aiff` → `afconvert` → `havoice play --announce` for spoken notifications.
-4. **Own voice pipeline in Rust**: the API's voice-assistant messages stream mic audio after the wake word; plug in
-   whisper → Claude → TTS and send audio back. Catch: only one client may own the voice assistant (currently HA),
-   so either take it over temporarily or do it inside HA as a custom conversation agent.
-5. **Custom firmware**: Grove sensors (temp/CO₂/PIR/light), extra WS2812 strip on RGBOUT, custom LED animations,
-   raw button/dial events. Built and flashed over USB from `firmware/`.
-6. **Sendspin**: the firmware already has a Sendspin source, so a Rust Sendspin server could stream synced audio from the Mac.
+MIT - see [LICENSE](LICENSE).

@@ -14,11 +14,13 @@ flacenc = "0.5.1"
 getrandom = "0.4.3"
 mdns-sd = "0.21.7"
 regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 serialport = "4.10.1"
+sha2 = "0.11.1"
 tokio = { version = "1.54.1", features = ["full"] }
 
 [dev-dependencies]
 esphome-native-api = "3.1.0"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "query"] }
 rpassword = "7.5.5"
-serde_json = "1.0.154"

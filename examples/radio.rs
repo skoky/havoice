@@ -24,7 +24,8 @@
 
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
+use clap::Parser;
 use havoice::{Event, MediaPlayerCommand, Rgb, VoicePe, tts};
 use tokio::io::AsyncBufReadExt;
 use tokio::task::JoinHandle;
@@ -60,10 +61,30 @@ struct Station {
 /// How station names are announced: `None` = silent, `Some(None)` = default voice.
 type Announce = Option<Option<String>>;
 
+/// Internet radio on the Voice PE, with volume control and spoken station names.
+/// While it plays, type + / - / v 40 (volume), n / p / a number (station), q (quit).
+#[derive(Parser)]
 struct Options {
+    /// Start volume: 30 or 0.3 both mean 30 %
+    #[arg(long, value_parser = parse_volume)]
     volume: Option<f32>,
-    announce: Announce,
+    /// Announce each station in this voice: a name (Daniel) or a language (cs)
+    #[arg(long)]
+    voice: Option<String>,
+    /// Announce each station in the default voice
+    #[arg(long)]
+    say: bool,
+    /// Search radio-browser.info for these words (default: the preset stations)
     query: Vec<String>,
+}
+
+/// `30`, `30%` and `0.3` all mean 30 %.
+fn parse_volume(s: &str) -> Result<f32, String> {
+    let v: f32 = s
+        .trim_end_matches('%')
+        .parse()
+        .map_err(|_| format!("{s:?} is not a number, e.g. 30 or 0.3"))?;
+    Ok(if v > 1.0 { v / 100.0 } else { v }.clamp(0.0, 1.0))
 }
 
 enum Action {
@@ -78,16 +99,16 @@ enum Action {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opts = parse_args()?;
+    let opts = Options::parse();
 
     // check the voice before anything plays, so a typo fails fast with a hint
-    let announce: Announce = match opts.announce {
-        Some(Some(v)) => {
-            let voice = tts::find_voice(&v).await?;
+    let announce: Announce = match &opts.voice {
+        Some(v) => {
+            let voice = tts::find_voice(v).await?;
             println!("voice: {} ({})", voice.name, voice.language);
             Some(Some(voice.name))
         }
-        other => other,
+        None => opts.say.then_some(None),
     };
 
     let stations = if opts.query.is_empty() {
@@ -184,41 +205,6 @@ async fn main() -> Result<()> {
     pe.close().await;
     println!("stopped.");
     Ok(())
-}
-
-fn parse_args() -> Result<Options> {
-    let mut opts = Options {
-        volume: None,
-        announce: None,
-        query: Vec::new(),
-    };
-    let mut args = std::env::args().skip(1);
-    while let Some(a) = args.next() {
-        match a.as_str() {
-            "--volume" => {
-                let v: f32 = args
-                    .next()
-                    .context("--volume needs a value, e.g. 30 or 0.3")?
-                    .trim_end_matches('%')
-                    .parse()
-                    .context("--volume must be a number, e.g. 30 or 0.3")?;
-                // 30 and 0.3 both mean 30 %
-                opts.volume = Some(if v > 1.0 { v / 100.0 } else { v }.clamp(0.0, 1.0));
-            }
-            "--voice" => {
-                let v = args
-                    .next()
-                    .context("--voice needs a name (Daniel) or language (cs)")?;
-                opts.announce = Some(Some(v));
-            }
-            "--say" => opts.announce = opts.announce.or(Some(None)),
-            flag if flag.starts_with("--") => {
-                bail!("unknown option {flag} (see the header of examples/radio.rs)")
-            }
-            _ => opts.query.push(a),
-        }
-    }
-    Ok(opts)
 }
 
 /// One line typed while the radio plays.

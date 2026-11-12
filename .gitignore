@@ -1,0 +1,6 @@
+/target
+.env
+logs/
+firmware/.esphome/
+firmware/secrets.yaml
+*.mp3

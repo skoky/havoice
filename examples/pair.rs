@@ -114,7 +114,7 @@ async fn show_status(port: Option<String>) -> Result<()> {
             (s, _) => println!("Wi-Fi    not set up ({s:?}) - use --wifi SSID"),
         }
     } else {
-        println!("USB      no /dev/cu.usbmodem* port - skipping Wi-Fi check");
+        println!("USB      no device on USB - skipping Wi-Fi check");
     }
     let found = discover::discover(Duration::from_secs(3)).await?;
     match found.iter().find(|d| d.name.contains("voice")) {

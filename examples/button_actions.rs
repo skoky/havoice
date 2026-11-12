@@ -1,9 +1,9 @@
-//! Use the Voice PE as a desk control: map button presses to actions on the Mac.
+//! Use the Voice PE as a desk control: map button presses to actions on this computer.
 //!
 //!     cargo run --example button_actions
 //!
 //! double press -> speak the time
-//! triple press -> speak the Mac's battery level
+//! triple press -> speak this computer's battery level (macOS `pmset`, Linux /sys/class/power_supply)
 //! long press   -> LED on (new colour) / off
 //! dial / mute  -> printed
 //!
@@ -30,9 +30,9 @@ async fn main() -> anyhow::Result<()> {
                 match press.as_str() {
                     "double_press" => {
                         let now = chrono::Local::now().format("%H:%M").to_string();
-                        pe.say(&format!("It is {now}")).await?;
+                        speak(&pe, &format!("It is {now}")).await;
                     }
-                    "triple_press" => pe.say(&battery()).await?,
+                    "triple_press" => speak(&pe, &battery()).await,
                     "long_press" => {
                         lit = !lit;
                         if lit {
@@ -60,15 +60,41 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Say `text`, but keep listening if speech fails (e.g. no espeak-ng on Linux).
+async fn speak(pe: &VoicePe, text: &str) {
+    println!("  says: {text}");
+    if let Err(e) = pe.say(text).await {
+        eprintln!("  speech failed: {e:#}");
+    }
+}
+
 fn battery() -> String {
+    match battery_percent() {
+        Some(p) => format!("The battery is at {p} percent"),
+        None => "This computer has no battery".into(),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn battery_percent() -> Option<u32> {
     let out = std::process::Command::new("pmset")
         .args(["-g", "batt"])
-        .output();
-    let text = out
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default();
-    match regex::Regex::new(r"(\d+)%").unwrap().captures(&text) {
-        Some(c) => format!("The Mac battery is at {} percent", &c[1]),
-        None => "This Mac has no battery".into(),
-    }
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    regex::Regex::new(r"(\d+)%").unwrap().captures(&text)?[1]
+        .parse()
+        .ok()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn battery_percent() -> Option<u32> {
+    // Linux: the first power supply of type Battery
+    std::fs::read_dir("/sys/class/power_supply")
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| std::fs::read_to_string(p.join("type")).is_ok_and(|t| t.trim() == "Battery"))
+        .and_then(|p| std::fs::read_to_string(p.join("capacity")).ok())
+        .and_then(|c| c.trim().parse().ok())
 }

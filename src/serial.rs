@@ -3,20 +3,42 @@
 use std::io::{Read, Write};
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 
+/// Espressif's USB vendor id - the ESP32-S3's built-in USB serial/JTAG.
+const ESPRESSIF_VID: u16 = 0x303a;
+
+/// The device's USB serial port: `/dev/cu.usbmodem*` on macOS, `/dev/ttyACM*` on Linux.
+/// An Espressif chip wins over other USB modems.
 pub fn default_port() -> Result<String> {
-    let mut ports: Vec<String> = serialport::available_ports()?
+    let ports: Vec<_> = serialport::available_ports()?
         .into_iter()
-        .map(|p| p.port_name)
-        .filter(|n| n.starts_with("/dev/cu.usbmodem"))
+        .map(|p| {
+            let espressif = matches!(
+                &p.port_type,
+                serialport::SerialPortType::UsbPort(u) if u.vid == ESPRESSIF_VID
+            );
+            (p.port_name, espressif)
+        })
         .collect();
-    ports.sort();
-    match ports.into_iter().next() {
-        Some(p) => Ok(p),
-        None => bail!("no /dev/cu.usbmodem* found - is the device plugged in via USB-C?"),
-    }
+    pick_port(ports).ok_or_else(|| {
+        anyhow!(
+            "no USB serial port found (/dev/cu.usbmodem* on macOS, /dev/ttyACM* on Linux) - \
+             is the device plugged in via USB-C? Or pass the port explicitly"
+        )
+    })
+}
+
+/// Best candidate from (name, is-Espressif) pairs. macOS lists every port twice, as
+/// `/dev/tty.*` (blocks on open) and `/dev/cu.*`; only the `cu` one is usable here.
+fn pick_port(ports: Vec<(String, bool)>) -> Option<String> {
+    let mut candidates: Vec<_> = ports
+        .into_iter()
+        .filter(|(n, _)| n.starts_with("/dev/cu.usbmodem") || n.starts_with("/dev/ttyACM"))
+        .collect();
+    candidates.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    candidates.into_iter().next().map(|(n, _)| n)
 }
 
 pub fn tail(
@@ -56,5 +78,35 @@ pub fn tail(
                 writeln!(f, "{plain}")?;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_port;
+
+    fn ports(list: &[(&str, bool)]) -> Vec<(String, bool)> {
+        list.iter().map(|(n, e)| (n.to_string(), *e)).collect()
+    }
+
+    #[test]
+    fn macos_takes_the_cu_device() {
+        let p = ports(&[
+            ("/dev/tty.usbmodem3101", true),
+            ("/dev/cu.Bluetooth-Incoming-Port", false),
+            ("/dev/cu.usbmodem3101", true),
+        ]);
+        assert_eq!(pick_port(p).as_deref(), Some("/dev/cu.usbmodem3101"));
+    }
+
+    #[test]
+    fn linux_prefers_the_espressif_chip() {
+        let p = ports(&[
+            ("/dev/ttyS0", false),
+            ("/dev/ttyACM0", false), // some other USB modem
+            ("/dev/ttyACM1", true),
+        ]);
+        assert_eq!(pick_port(p).as_deref(), Some("/dev/ttyACM1"));
+        assert_eq!(pick_port(ports(&[("/dev/ttyS0", false)])), None);
     }
 }

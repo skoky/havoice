@@ -5,7 +5,7 @@
 //! use havoice::{Event, Rgb, VoicePe};
 //! let pe = VoicePe::from_env().await?;          // HAVOICE_HOST / HAVOICE_KEY or .env
 //! pe.led(Rgb(255, 100, 0), 0.8).await?;          // LED ring orange
-//! pe.say("Hello from the Mac").await?;           // macOS `say` -> speaker
+//! pe.say("Hello from the Mac").await?;           // say / espeak-ng -> speaker
 //! let mut events = pe.events().await?;
 //! while let Some(ev) = events.next().await {
 //!     if let Event::Button(press) = ev { println!("button: {press}"); }
@@ -330,7 +330,8 @@ impl VoicePe {
         Ok(())
     }
 
-    /// Speak `text` on the device with the Mac's `say` voice, and wait until it's done.
+    /// Speak `text` on the device (macOS `say`, `espeak-ng` on Linux - see `HAVOICE_TTS`)
+    /// and wait until it's done.
     pub async fn say(&self, text: &str) -> Result<()> {
         self.play_pcm(&speech(text).await?, true).await
     }
@@ -618,17 +619,54 @@ fn unreachable(e: &anyhow::Error) -> bool {
     matches!(io_kind(e), Some(HostUnreachable | NetworkUnreachable))
 }
 
-/// Render `text` with macOS `say` to 16-bit mono PCM.
+/// Text-to-speech program: `HAVOICE_TTS` if set (`say`, `espeak-ng` or `espeak`),
+/// else macOS `say` / `espeak-ng` everywhere else.
+fn tts_engine() -> String {
+    std::env::var("HAVOICE_TTS")
+        .ok()
+        .filter(|e| !e.is_empty())
+        .unwrap_or_else(|| {
+            if cfg!(target_os = "macos") {
+                "say".into()
+            } else {
+                "espeak-ng".into()
+            }
+        })
+}
+
+/// Render `text` to 16-bit mono PCM with the system's speech (see [`tts_engine`]).
 async fn speech(text: &str) -> Result<Pcm> {
+    let engine = tts_engine();
     let out = std::env::temp_dir().join(format!("havoice-say-{}.wav", std::process::id()));
-    let status = tokio::process::Command::new("say")
-        .args(["--file-format=WAVE", "--data-format=LEI16@22050", "-o"])
+    let mut cmd = tokio::process::Command::new(&engine);
+    if Path::new(&engine).file_name().is_some_and(|n| n == "say") {
+        cmd.args(["--file-format=WAVE", "--data-format=LEI16@22050", "-o"]);
+    } else {
+        // espeak / espeak-ng: 16-bit mono WAV at 22.05 kHz; voice from HAVOICE_TTS_VOICE (e.g. cs)
+        if let Ok(voice) = std::env::var("HAVOICE_TTS_VOICE")
+            && !voice.is_empty()
+        {
+            cmd.args(["-v", &voice]);
+        }
+        cmd.arg("-w");
+    }
+    let status = cmd
         .arg(&out)
         .arg(text)
         .status()
         .await
-        .context("running macOS `say`")?;
-    anyhow::ensure!(status.success(), "`say` failed");
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => anyhow!(
+                "speech needs `{engine}`, which isn't installed{}",
+                if cfg!(target_os = "macos") {
+                    ""
+                } else {
+                    " - on Ubuntu/Debian: sudo apt install espeak-ng"
+                }
+            ),
+            _ => anyhow!(e).context(format!("running `{engine}`")),
+        })?;
+    anyhow::ensure!(status.success(), "`{engine}` failed ({status})");
     let wav = std::fs::read(&out);
     let _ = std::fs::remove_file(&out);
     Pcm::from_wav(&wav?)

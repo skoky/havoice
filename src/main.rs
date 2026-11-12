@@ -32,7 +32,7 @@ enum Cmd {
     },
     /// Tail the USB serial log
     Serial {
-        /// Serial port (default: first /dev/cu.usbmodem*)
+        /// Serial port (default: the Espressif /dev/cu.usbmodem* on macOS, /dev/ttyACM* on Linux)
         #[arg(long, env = "HAVOICE_SERIAL")]
         port: Option<String>,
         /// Only lines matching this regex (case-insensitive)

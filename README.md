@@ -66,21 +66,39 @@ targets another device for one run.
 | `cargo run --example led_show [-- ff6600\|Rainbow\|off]` | key | colour wheel animation, one colour, or a firmware effect |
 | `cargo run --example speak -- "text"` / `-- --file x.mp3` | key | speech (`say` / `espeak-ng`) or a local file on the speaker (as announcement) |
 | `cargo run --example synth -- [chime\|arp\|alarm\|sweep\|waves]` | key | sounds generated in Rust (`havoice::Pcm`), FLAC-encoded in-process, LED colour per sound |
-| `cargo run --example radio` / `-- jazz` | key | internet radio: presets, or any other argument searches radio-browser.info (MP3); now-playing titles; double press = next, triple = previous, long = stop |
+| `cargo run --example radio -- [--volume 30] [--say \| --voice Daniel\|cs] [jazz]` | key | internet radio: presets, or other words search radio-browser.info (MP3); now-playing titles; station names spoken in a chosen voice; type `+` / `-` / `v 40` for volume, `n` / `p` / a number for stations, `q` to quit; on the device double press = next, triple = previous, long = stop |
 | `cargo run --example button_actions` | key | desk control pad: double = says the time, triple = says the battery level, long = LED colour on/off |
 | `cargo run --example pair -- --status` | USB | read-only: Wi-Fi state over USB (Improv) and whether the device has an API key |
 | `cargo run --example pair [-- --wifi SSID]` | USB | no-HA setup of a factory-reset device: Wi-Fi over USB, then a fresh key into `.env` (not yet run on a real device) |
 
-Speech (`say`, `speak`, `tour`, `button_actions`) runs a text-to-speech program on this computer and sends the
-result to the device as FLAC: macOS `say`, Linux `espeak-ng`. Pick another with `HAVOICE_TTS` (`say`,
-`espeak-ng`, `espeak`) and an espeak voice with `HAVOICE_TTS_VOICE` (e.g. `cs`, `en-us`).
+### Voice and volume from Rust
+
+Speech runs a text-to-speech program on this computer (macOS `say`, Linux `espeak-ng`) and sends the result to
+the device as FLAC. The voice is chosen per call, or once for everything:
+
+```rust
+use havoice::tts;
+
+pe.say("Default voice").await?;                          // HAVOICE_TTS_VOICE, else the system voice
+pe.say_voice("Hello from Daniel", "Daniel").await?;      // a voice by name
+let cz = tts::find_voice("cs").await?;                   // ... or the first voice of a language
+pe.say_voice("Dobrý den", &cz.name).await?;
+for v in tts::voices().await? { println!("{} {}", v.name, v.language); }
+
+pe.set_volume(0.3).await?;                               // speaker volume 0.0 - 1.0
+```
+
+`cargo run -- voices [cs]` lists what's installed. Speech program: `HAVOICE_TTS` (`say`, `espeak-ng`, `espeak`);
+default voice: `HAVOICE_TTS_VOICE` (`Zuzana`, `cs`, `en-us`, …). On macOS, more voices (Czech Zuzana among them)
+are added under System Settings → Accessibility → Spoken Content → System voice → Manage Voices.
 
 ## Library API (`havoice`)
 
 * `VoicePe`: `connect` / `from_env`, `info`, `entities`, `led` / `led_fade` / `led_effect` / `led_off`,
-  `play_url` / `play_file` / `say`, `media` / `set_volume`, `select` / `switch` / `number` / `press`,
+  `play_url` / `play_file` / `play_pcm` / `say` / `say_voice`, `media` / `set_volume`, `select` / `switch` / `number` / `press`,
   `wake_words` / `set_wake_word` / `set_wake_sound`, `events() -> Events` (typed `Event`s), `client()` for raw access.
 * `api::Client`: lower-level client (subscribe to every raw message, send any `proto` message).
+* `tts`: `voices`, `find_voice`, `render` (text → `Pcm`) with `say` / `espeak-ng`.
 * `discover`, `serial`, `serve`: mDNS, USB log, local file server.
 * `proto`: re-export of every ESPHome protobuf message (API 1.16).
 
@@ -95,7 +113,8 @@ result to the device as FLAC: macOS `say`, Linux `espeak-ng`. Pick another with 
 | `havoice watch` | key | live state stream: button events, dial/volume, mute, LEDs, media player |
 | `havoice logs [--level debug]` | key | device log over Wi-Fi |
 | `havoice led ff6600` / `led Rainbow` / `led off` | key | LED ring: colour, effect, off |
-| `havoice say "hello there"` | key | speak (macOS `say`, Linux `espeak-ng`) |
+| `havoice say [--voice Daniel\|cs] "hello there"` | key | speak (macOS `say`, Linux `espeak-ng`), optionally in a given voice or language |
+| `havoice voices [cs]` | – | text-to-speech voices on this computer, optionally one language |
 | `havoice play song.mp3 [--announce] [--volume .4]` | key | streams a local file from this Mac (built-in HTTP server) or a URL |
 | `havoice media pause\|stop\|volume 0.3 …` | key | media player |
 | `havoice select wake_word "Hey Jarvis"` | key | any select |
@@ -147,6 +166,7 @@ src/serial.rs           USB log tail
 src/improv.rs           Improv Wi-Fi setup over the USB serial port
 src/audio.rs            Pcm samples, FLAC encoding, WAV reading
 src/serve.rs            one-file HTTP server for play_file / say
+src/tts.rs              text-to-speech: say / espeak-ng, voice list and lookup
 src/main.rs             `havoice` CLI on top of the library
 examples/               runnable demos (see above)
 tests/fake_device.rs    end-to-end tests against a fake encrypted device (esphome-native-api device side)

@@ -1,4 +1,4 @@
-//! `havoice` - poke at a Home Assistant Voice Preview Edition from the Mac.
+//! `havoice` - poke at a Home Assistant Voice Preview Edition from this computer.
 //! Thin CLI over the `havoice` library (see examples/ for programmatic use).
 
 use std::path::PathBuf;
@@ -63,7 +63,14 @@ enum Cmd {
         brightness: f32,
     },
     /// Speak text with the Mac's `say` voice
-    Say { text: Vec<String> },
+    Say {
+        /// Voice name (e.g. Zuzana) or language (e.g. cs) - see `havoice voices`
+        #[arg(long)]
+        voice: Option<String>,
+        text: Vec<String>,
+    },
+    /// Text-to-speech voices on this computer, optionally only one language (e.g. cs)
+    Voices { language: Option<String> },
     /// Play an http(s) URL or a local mp3/flac/wav file
     Play {
         src: String,
@@ -177,6 +184,16 @@ async fn main() -> Result<()> {
             })
             .await?;
         }
+        Cmd::Voices { language } => {
+            let lang = language.map(|l| l.to_lowercase().replace('-', "_"));
+            for v in havoice::tts::voices().await? {
+                let vl = v.language.to_lowercase().replace('-', "_");
+                if lang.as_ref().is_none_or(|l| vl.starts_with(l.as_str())) {
+                    println!("{:28} {:8} {}", v.name, v.language, v.about);
+                }
+            }
+            return Ok(());
+        }
         _ => {}
     }
 
@@ -191,7 +208,7 @@ async fn main() -> Result<()> {
     let pe = VoicePe::connect(&host, key.as_deref()).await?;
 
     match cli.cmd {
-        Cmd::Discover { .. } | Cmd::Serial { .. } => unreachable!(),
+        Cmd::Discover { .. } | Cmd::Serial { .. } | Cmd::Voices { .. } => unreachable!(),
         Cmd::Info => {
             let d = pe.info().await?;
             let h = &pe.client().hello;
@@ -266,7 +283,16 @@ async fn main() -> Result<()> {
             }
             effect => pe.led_effect(effect).await?,
         },
-        Cmd::Say { text } => pe.say(&text.join(" ")).await?,
+        Cmd::Say { voice, text } => {
+            let text = text.join(" ");
+            match voice {
+                Some(v) => {
+                    let v = havoice::tts::find_voice(&v).await?;
+                    pe.say_voice(&text, &v.name).await?
+                }
+                None => pe.say(&text).await?,
+            }
+        }
         Cmd::Play {
             src,
             announce,

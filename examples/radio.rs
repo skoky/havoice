@@ -1,19 +1,32 @@
-//! Internet radio on the Voice PE.
+//! Internet radio on the Voice PE, with volume control and spoken station names.
 //!
-//!     cargo run --example radio                 # preset stations
-//!     cargo run --example radio -- jazz         # search radio-browser.info (MP3 streams)
+//!     cargo run --example radio                          # preset stations
+//!     cargo run --example radio -- jazz                  # search radio-browser.info (MP3 streams)
+//!     cargo run --example radio -- --volume 30           # start at 30 % (0.3 works too)
+//!     cargo run --example radio -- --say                 # announce each station (default voice)
+//!     cargo run --example radio -- --voice Daniel jazz   # ... in a given voice
+//!     cargo run --example radio -- --voice cs            # ... in the first Czech voice
 //!
-//! On the device: double press = next station, triple press = previous,
-//! long press = stop and quit; the dial changes volume as usual. Ctrl-C also stops.
+//! Voices come from the computer's speech program (macOS `say`, Linux `espeak-ng`);
+//! `cargo run -- voices` lists them, `cargo run -- voices cs` only Czech ones.
 //!
-//! The device fetches the stream itself (HTTP or HTTPS) - the Mac only tells it which URL.
+//! While it plays, type a command and press Enter:
+//!     +  /  -        louder / quieter by 5 % (`+++` = 15 %)
+//!     v 40           volume 40 %
+//!     n  /  p        next / previous station, or a station number
+//!     q              stop and quit (Ctrl-C too)
+//! On the device: double press = next, triple press = previous, long press = stop;
+//! the dial changes the volume as usual.
+//!
+//! The device fetches the stream itself (HTTP or HTTPS) - this computer only tells it which URL.
 //! The firmware decodes MP3 and FLAC, so AAC / HLS / Ogg stations won't play.
-//! "Now playing" comes from the stream's ICY metadata, read here on the Mac.
+//! "Now playing" comes from the stream's ICY metadata, read here.
 
 use std::time::Duration;
 
-use anyhow::{Result, bail};
-use havoice::{Event, MediaPlayerCommand, Rgb, VoicePe};
+use anyhow::{Context, Result, bail};
+use havoice::{Event, MediaPlayerCommand, Rgb, VoicePe, tts};
+use tokio::io::AsyncBufReadExt;
 use tokio::task::JoinHandle;
 
 const PRESETS: &[(&str, &str)] = &[
@@ -36,15 +49,48 @@ const PRESETS: &[(&str, &str)] = &[
 /// radio-browser.info asks clients to identify themselves.
 const USER_AGENT: &str = "havoice-example/0.1";
 
+/// Volume step for `+` / `-`, in percent.
+const STEP: i32 = 5;
+
 struct Station {
     name: String,
     url: String,
 }
 
+/// How station names are announced: `None` = silent, `Some(None)` = default voice.
+type Announce = Option<Option<String>>;
+
+struct Options {
+    volume: Option<f32>,
+    announce: Announce,
+    query: Vec<String>,
+}
+
+enum Action {
+    Step(isize),
+    Goto(usize),
+    Louder(i32),
+    SetVolume(u32),
+    Help,
+    Quit,
+    Nothing,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let query: Vec<String> = std::env::args().skip(1).collect();
-    let stations = if query.is_empty() {
+    let opts = parse_args()?;
+
+    // check the voice before anything plays, so a typo fails fast with a hint
+    let announce: Announce = match opts.announce {
+        Some(Some(v)) => {
+            let voice = tts::find_voice(&v).await?;
+            println!("voice: {} ({})", voice.name, voice.language);
+            Some(Some(voice.name))
+        }
+        other => other,
+    };
+
+    let stations = if opts.query.is_empty() {
         PRESETS
             .iter()
             .map(|(n, u)| Station {
@@ -53,7 +99,7 @@ async fn main() -> Result<()> {
             })
             .collect()
     } else {
-        search(&query.join(" ")).await?
+        search(&opts.query.join(" ")).await?
     };
     for (i, s) in stations.iter().enumerate() {
         println!("{:2}. {}", i + 1, s.name);
@@ -61,43 +107,75 @@ async fn main() -> Result<()> {
 
     let pe = VoicePe::from_env().await?;
     let mut events = pe.events().await?;
-    println!("\ndouble press = next, triple = previous, long press = stop (or Ctrl-C)\n");
+    if let Some(v) = opts.volume {
+        pe.set_volume(v).await?;
+    }
+    println!();
+    help();
 
     let mut i = 0;
-    let mut titles = tune(&pe, &stations, i).await?;
-    let mut volume = None;
+    let mut titles = tune(&pe, &stations, i, &announce).await?;
+    let mut volume: Option<u32> = None;
+    let mut stdin = tokio::io::BufReader::new(tokio::io::stdin()).lines();
+    let mut stdin_open = true;
     let ctrl_c = tokio::signal::ctrl_c();
     tokio::pin!(ctrl_c);
 
     loop {
-        let ev = tokio::select! {
-            _ = &mut ctrl_c => break,
-            ev = events.next() => ev,
-        };
-        let step = match ev {
-            None => {
-                eprintln!("connection closed: {}", pe.client().close_reason());
-                break;
-            }
-            Some(Event::Button(press)) => match press.as_str() {
-                "double_press" => 1,
-                "triple_press" => stations.len() - 1,
-                "long_press" => break,
-                _ => continue,
-            },
-            Some(Event::Media { volume: v, .. }) => {
-                let pct = (v * 100.0).round() as u32;
-                if volume.is_some_and(|old| old != pct) {
-                    println!("  volume {pct}%");
+        let action = tokio::select! {
+            _ = &mut ctrl_c => Action::Quit,
+            line = stdin.next_line(), if stdin_open => match line {
+                Ok(Some(l)) => command(&l, stations.len()),
+                _ => {
+                    stdin_open = false; // e.g. started in the background
+                    Action::Nothing
                 }
-                volume = Some(pct);
+            },
+            ev = events.next() => match ev {
+                None => {
+                    eprintln!("connection closed: {}", pe.client().close_reason());
+                    Action::Quit
+                }
+                Some(Event::Button(press)) => match press.as_str() {
+                    "double_press" => Action::Step(1),
+                    "triple_press" => Action::Step(-1),
+                    "long_press" => Action::Quit,
+                    _ => Action::Nothing,
+                },
+                // the device reports every change: the dial, `+`/`-` here, Home Assistant
+                Some(Event::Media { volume: v, .. }) => {
+                    let pct = (v * 100.0).round() as u32;
+                    if volume != Some(pct) {
+                        println!("  volume {pct}%");
+                    }
+                    volume = Some(pct);
+                    Action::Nothing
+                }
+                Some(_) => Action::Nothing,
+            },
+        };
+        let next = match action {
+            Action::Quit => break,
+            Action::Nothing => continue,
+            Action::Help => {
+                help();
                 continue;
             }
-            Some(_) => continue,
+            Action::Louder(d) => {
+                let pct = (volume.unwrap_or(50) as i32 + d).clamp(0, 100);
+                pe.set_volume(pct as f32 / 100.0).await?;
+                continue;
+            }
+            Action::SetVolume(pct) => {
+                pe.set_volume(pct.min(100) as f32 / 100.0).await?;
+                continue;
+            }
+            Action::Step(d) => (i as isize + d).rem_euclid(stations.len() as isize) as usize,
+            Action::Goto(k) => k,
         };
-        i = (i + step) % stations.len();
+        i = next;
         titles.abort();
-        titles = tune(&pe, &stations, i).await?;
+        titles = tune(&pe, &stations, i, &announce).await?;
     }
 
     titles.abort();
@@ -108,12 +186,99 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn parse_args() -> Result<Options> {
+    let mut opts = Options {
+        volume: None,
+        announce: None,
+        query: Vec::new(),
+    };
+    let mut args = std::env::args().skip(1);
+    while let Some(a) = args.next() {
+        match a.as_str() {
+            "--volume" => {
+                let v: f32 = args
+                    .next()
+                    .context("--volume needs a value, e.g. 30 or 0.3")?
+                    .trim_end_matches('%')
+                    .parse()
+                    .context("--volume must be a number, e.g. 30 or 0.3")?;
+                // 30 and 0.3 both mean 30 %
+                opts.volume = Some(if v > 1.0 { v / 100.0 } else { v }.clamp(0.0, 1.0));
+            }
+            "--voice" => {
+                let v = args
+                    .next()
+                    .context("--voice needs a name (Daniel) or language (cs)")?;
+                opts.announce = Some(Some(v));
+            }
+            "--say" => opts.announce = opts.announce.or(Some(None)),
+            flag if flag.starts_with("--") => {
+                bail!("unknown option {flag} (see the header of examples/radio.rs)")
+            }
+            _ => opts.query.push(a),
+        }
+    }
+    Ok(opts)
+}
+
+/// One line typed while the radio plays.
+fn command(line: &str, stations: usize) -> Action {
+    let l = line.trim().to_lowercase();
+    if !l.is_empty() && l.chars().all(|c| c == '+') {
+        return Action::Louder(STEP * l.len() as i32);
+    }
+    if !l.is_empty() && l.chars().all(|c| c == '-') {
+        return Action::Louder(-STEP * l.len() as i32);
+    }
+    match l.as_str() {
+        "" => Action::Nothing,
+        "n" | "next" => Action::Step(1),
+        "p" | "prev" => Action::Step(-1),
+        "q" | "quit" | "stop" => Action::Quit,
+        _ => {
+            if let Some(Ok(pct)) = l
+                .strip_prefix('v')
+                .map(|v| v.trim().trim_end_matches('%').parse::<u32>())
+            {
+                return Action::SetVolume(pct);
+            }
+            match l.parse::<usize>() {
+                Ok(k) if (1..=stations).contains(&k) => Action::Goto(k - 1),
+                _ => Action::Help,
+            }
+        }
+    }
+}
+
+fn help() {
+    println!(
+        "type + / - (volume ±{STEP} %), v 40 (volume 40 %), n / p or a number (station), q (quit)\n\
+         device: double press = next, triple = previous, long press = stop, dial = volume\n"
+    );
+}
+
 /// Switch the device to station `i`, tint the LED ring, and start printing its titles.
-async fn tune(pe: &VoicePe, stations: &[Station], i: usize) -> Result<JoinHandle<()>> {
+/// With `announce`, the station name is spoken first (over the old station, which ducks).
+async fn tune(
+    pe: &VoicePe,
+    stations: &[Station],
+    i: usize,
+    announce: &Announce,
+) -> Result<JoinHandle<()>> {
     let s = &stations[i];
-    println!("▶ {}  ({})", s.name, s.url);
-    pe.play_url(&s.url, false).await?;
+    println!("▶ {}. {}  ({})", i + 1, s.name, s.url);
     pe.led(Rgb::wheel((i * 47) as u8), 0.25).await?;
+    if let Some(voice) = announce {
+        let text = spoken_name(&s.name);
+        let said = match voice {
+            Some(v) => pe.say_voice(&text, v).await,
+            None => pe.say(&text).await,
+        };
+        if let Err(e) = said {
+            eprintln!("  (couldn't announce: {e:#})");
+        }
+    }
+    pe.play_url(&s.url, false).await?;
     let url = s.url.clone();
     Ok(tokio::spawn(async move {
         let mut last = String::new();
@@ -127,6 +292,18 @@ async fn tune(pe: &VoicePe, stations: &[Station], i: usize) -> Result<JoinHandle
             tokio::time::sleep(Duration::from_secs(20)).await;
         }
     }))
+}
+
+/// Station names from the directory carry clutter: "SomaFM Groove Salad (128k MP3)",
+/// "Dance Wave! | MP3". Speak only the part before it.
+fn spoken_name(name: &str) -> String {
+    let short = name
+        .split(['(', '|', '[', ','])
+        .next()
+        .unwrap_or(name)
+        .trim();
+    let short = if short.is_empty() { name } else { short };
+    short.chars().take(60).collect()
 }
 
 /// Find MP3 stations by name on radio-browser.info, most voted first.

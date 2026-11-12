@@ -13,6 +13,7 @@ pub mod discover;
 pub mod improv;
 pub mod serial;
 pub mod serve;
+pub mod tts;
 
 pub use audio::Pcm;
 pub use device::{Event, Events, MediaPlayerCommand, Rgb, VoicePe};

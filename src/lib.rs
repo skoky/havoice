@@ -14,6 +14,7 @@ pub mod improv;
 pub mod serial;
 pub mod serve;
 pub mod tts;
+pub mod wake_word;
 
 pub use audio::Pcm;
 pub use device::{Event, Events, MediaPlayerCommand, Rgb, VoicePe};

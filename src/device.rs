@@ -187,6 +187,11 @@ impl VoicePe {
         &self.client
     }
 
+    /// The device's IP address (as connected).
+    pub fn ip(&self) -> IpAddr {
+        self.ip
+    }
+
     pub fn entities(&self) -> &[Entity] {
         &self.entities
     }

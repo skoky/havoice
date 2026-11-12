@@ -15,25 +15,38 @@
 
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
+use clap::Parser;
 use havoice::device::{find_on_lan, load_env};
 use havoice::improv::{Improv, State};
 use havoice::{Rgb, VoicePe, discover, serial};
 
+/// Set up a Voice PE without Home Assistant: Wi-Fi over USB, then a fresh API key.
+#[derive(Parser)]
+struct Args {
+    /// Read-only: Wi-Fi state over USB and whether the device has a key
+    #[arg(long, conflicts_with_all = ["wifi", "rotate"])]
+    status: bool,
+    /// Send Wi-Fi settings over USB first (password: HAVOICE_WIFI_PASSWORD or prompt)
+    #[arg(long, value_name = "SSID")]
+    wifi: Option<String>,
+    /// Replace the key of an already paired device (cuts off Home Assistant)
+    #[arg(long)]
+    rotate: bool,
+    /// USB serial port (default: the Espressif one)
+    #[arg(long, env = "HAVOICE_SERIAL")]
+    port: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     load_env();
-    let mut args = std::env::args().skip(1);
-    let (mut status, mut rotate, mut wifi, mut port) = (false, false, None, None);
-    while let Some(a) = args.next() {
-        match a.as_str() {
-            "--status" => status = true,
-            "--rotate" => rotate = true,
-            "--wifi" => wifi = Some(args.next().context("--wifi needs an SSID")?),
-            "--port" => port = Some(args.next().context("--port needs a path")?),
-            other => bail!("unknown argument {other:?} (see the header of examples/pair.rs)"),
-        }
-    }
+    let Args {
+        status,
+        wifi,
+        rotate,
+        port,
+    } = Args::parse();
     let port = || -> Result<String> {
         match &port {
             Some(p) => Ok(p.clone()),

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Train an "Ahoj Hugo" microWakeWord model locally.
+"""Train "Ahoj Hugo" wake word models locally: both files by default.
 
-Local equivalent of training/train_ahoj_hugo.ipynb. Point it at the samples
-produced by training/generate_samples.py (a directory or the zip) and it does
-the rest: augmentation data, negative datasets, spectrogram features,
-training, quantization, manifest.
+  ahoj_hugo.tflite + .json  microWakeWord, for the Voice PE device (havoice)
+  ahoj_hugo.onnx            openWakeWord classifier for the Hugo assistant,
+                            trained by training/train_oww.py
+
+Local equivalent of training/train_ahoj_hugo.ipynb (which builds only the
+.tflite). Point it at the samples produced by training/generate_samples.py (a
+directory or the zip) and it does the rest: augmentation data, negative
+datasets, spectrogram features, training, quantization, manifest. The ONNX
+model trains first (minutes); --no-onnx or --onnx-only build just one.
 
     python3 -m pip install 'datasets<4'
     git clone https://github.com/kahrendt/microWakeWord
@@ -43,10 +48,14 @@ def need(module: str, hint: str) -> None:
         sys.exit(f"missing {module}: {hint}")
 
 
-def check_environment() -> None:
-    need("microwakeword",
-         "git clone https://github.com/kahrendt/microWakeWord "
-         "&& python3 -m pip install -e ./microWakeWord")
+def check_environment(tflite: bool = True, onnx: bool = False) -> None:
+    if tflite:
+        need("microwakeword",
+             "git clone https://github.com/kahrendt/microWakeWord "
+             "&& python3 -m pip install -e ./microWakeWord")
+    if onnx:
+        need("onnx", "python3 -m pip install onnx")
+        need("onnxruntime", "python3 -m pip install onnxruntime")
     need("datasets", "python3 -m pip install 'datasets<4'")
     import datasets
     if int(datasets.__version__.split(".")[0]) >= 4:
@@ -314,6 +323,19 @@ def train() -> None:
         check=True)
 
 
+def train_onnx(samples: Path, negatives: Path | None, out_dir: Path,
+               assistant: Path | None) -> None:
+    """openWakeWord classifier for the Hugo assistant (train_oww.py), in its
+    own process so its TensorFlow session frees the GPU before microWakeWord."""
+    command = [sys.executable, str(SCRIPT_DIR / "train_oww.py"), "--samples", str(samples),
+               "--out", str(out_dir / "ahoj_hugo.onnx"), "--workdir", "."]
+    if negatives:
+        command += ["--negatives", str(negatives)]
+    if assistant:
+        command += ["--assistant", str(assistant)]
+    subprocess.run(command, check=True)
+
+
 def package(out_dir: Path) -> None:
     produced = sorted(Path("trained_models/wakeword").rglob("*.tflite"))
     if not produced:
@@ -359,20 +381,36 @@ def main() -> None:
                              "(--negatives-out), phrases the model must not wake on")
     parser.add_argument("--skip-download-data", action="store_true",
                         help="reuse previously downloaded augmentation/negative data")
+    which = parser.add_mutually_exclusive_group()
+    which.add_argument("--no-onnx", action="store_true",
+                       help="build only the microWakeWord .tflite")
+    which.add_argument("--onnx-only", action="store_true",
+                       help="build only the openWakeWord .onnx for the Hugo assistant")
+    parser.add_argument("--assistant", type=Path, default=None,
+                        help="hugo assistant checkout for the ONNX step: its feature models "
+                             "and test recordings (train_oww.py defaults to "
+                             "~/mywork/hugo/assistant if present)")
     args = parser.parse_args()
 
-    check_environment()
+    tflite, onnx = not args.onnx_only, not args.no_onnx
+    check_environment(tflite, onnx)
     samples = args.samples.resolve()
     negatives = args.negatives.resolve() if args.negatives else None
+    assistant = args.assistant.expanduser().resolve() if args.assistant else None
     out_dir = args.out.resolve()
     args.workdir.mkdir(parents=True, exist_ok=True)
     os.chdir(args.workdir)
-    unpack_samples(samples, Path("generated_samples"))
-    if negatives:
-        unpack_samples(negatives, Path("generated_negatives"), "negative")
+    if tflite:
+        unpack_samples(samples, Path("generated_samples"))
+        if negatives:
+            unpack_samples(negatives, Path("generated_negatives"), "negative")
 
-    if not args.skip_download_data:
-        download_data()
+    if tflite and not args.skip_download_data:
+        download_data()  # train_oww.py fetches what it needs itself
+    if onnx:
+        train_onnx(samples, negatives, out_dir, assistant)
+    if not tflite:
+        return
     build_features(Path("generated_samples"), Path("generated_augmented_features"))
     if negatives:
         build_features(Path("generated_negatives"), Path("generated_negative_features"))

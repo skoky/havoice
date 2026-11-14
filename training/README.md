@@ -2,13 +2,16 @@
 
 The Voice PE only runs [microWakeWord](https://github.com/kahrendt/microWakeWord) models
 (int8 streaming TFLite, 40-bin spectrogram input). An openWakeWord model can't be converted
-into one; it has to be trained from audio. This directory covers every step, from no data
-to a flashed device:
+into one; it has to be trained from audio. The Hugo assistant runs an
+[openWakeWord](https://github.com/dscripka/openWakeWord) ONNX classifier instead. Training
+builds both from the same samples. This directory covers every step, from no data to a
+flashed device:
 
 ```
 generate_samples.py ──► samples/ahoj_hugo.zip ──► train_ahoj_hugo.py ──► ahoj_hugo_model/
-   (Piper, edge-tts,        1000+ 16 kHz WAVs       (or the Colab          ahoj_hugo.tflite
-    say, your voice)                                 notebook)              ahoj_hugo.json
+   (Piper, edge-tts,        1000+ 16 kHz WAVs       (or the Colab          ahoj_hugo.tflite ─► Voice PE
+    say, your voice)                                 notebook:             ahoj_hugo.json
+                                                     .tflite only)         ahoj_hugo.onnx ──► Hugo assistant
                                                                                  │
                                          cargo run --example wake_word -- install --flash
 ```
@@ -16,7 +19,9 @@ generate_samples.py ──► samples/ahoj_hugo.zip ──► train_ahoj_hugo.py
 | file | purpose |
 |---|---|
 | `generate_samples.py` | Czech samples: "Ahoj Hugo" + "Ahoj Google" positives, optional negatives (Piper voices, edge-tts, macOS `say`, real recordings) |
-| `train_ahoj_hugo.py` | local training: downloads, augmentation, features, training, quantization, manifest |
+| `train_ahoj_hugo.py` | local training of both models: downloads, augmentation, features, training, quantization, manifest |
+| `train_oww.py` | the ONNX step on its own (run by `train_ahoj_hugo.py`) |
+| `mww_train.py` | runs microWakeWord's training with small-GPU fixes (run by `train_ahoj_hugo.py`) |
 | `train_ahoj_hugo.ipynb` | the same pipeline as a Google Colab notebook (free GPU) |
 
 Run every command below **from the repository root**. The scripts use paths relative to it

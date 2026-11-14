@@ -89,7 +89,7 @@ def synth_piper(voice, text: str, tmp: Path, rng: random.Random) -> None:
     from piper import SynthesisConfig
 
     config = SynthesisConfig(
-        length_scale=rng.uniform(0.8, 1.2),
+        length_scale=rng.uniform(0.65, 1.4),
         noise_scale=rng.uniform(0.5, 0.8),
         noise_w_scale=rng.uniform(0.6, 1.0),
     )
@@ -100,11 +100,11 @@ def synth_edge(text: str, tmp_mp3: Path, rng: random.Random) -> bool:
     if not shutil.which("edge-tts") and not shutil.which("edge_tts"):
         return False
     voice = rng.choice(EDGE_VOICES)
-    rate = f"{rng.randint(-15, 15):+d}%"
+    rate = f"{rng.randint(-35, 35):+d}%"
     pitch = f"{rng.randint(-15, 15):+d}Hz"
     result = subprocess.run(
         ["edge-tts", "--voice", voice, "--text", text,
-         f"--rate={rate}", f"--pitch={pitch}", "--write-media", str(tmp_mp3)],
+         f"--rate={rate}"   , f"--pitch={pitch}", "--write-media", str(tmp_mp3)],
         capture_output=True,
     )
     return result.returncode == 0 and tmp_mp3.exists()

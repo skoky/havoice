@@ -184,11 +184,14 @@ def build_features(clips_dir: Path) -> None:
                 clips=clips, augmenter=augmenter,
                 slide_frames=1, step_ms=10)
             split_name, repeat = "test", 1
+        # Write 100 spectrograms per flush, not 1: every flush remaps the
+        # files, and on macOS each new mmap issues F_FULLFSYNC (a full drive
+        # cache flush), which made feature generation mostly disk waits.
         RaggedMmap.from_generator(
             out_dir=str(output_dir / split / "wakeword_mmap"),
             sample_generator=spectrograms.spectrogram_generator(
                 split=split_name, repeat=repeat),
-            batch_size=1)
+            batch_size=100)
 
 
 def write_config() -> None:

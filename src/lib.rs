@@ -31,6 +31,7 @@
 //!   firmware plays FLAC and MP3, not WAV).
 //! * [`tts`] - text-to-speech with a choice of voice.
 //! * [`wake_word`] - check microWakeWord models, build them into firmware, watch detections.
+//! * [`onnx`] - read an `.onnx` model and judge how far it is from a microWakeWord `.tflite`.
 //! * [`improv`] - Wi-Fi setup over the USB cable (Improv Serial); [`serial`] - the USB log.
 //! * [`discover`] - mDNS discovery; [`serve`] - the one-file HTTP server the device streams from.
 //! * [`api::Client`] and [`proto`] - the raw ESPHome API for everything else.
@@ -56,6 +57,7 @@ pub mod audio;
 pub mod device;
 pub mod discover;
 pub mod improv;
+pub mod onnx;
 pub mod serial;
 pub mod serve;
 pub mod tts;

@@ -79,7 +79,7 @@ def patch_datasets_pickler() -> None:
     _dill.Pickler._batch_setitems = _batch_setitems
 
 
-def unpack_samples(samples: Path, clips_dir: Path) -> None:
+def unpack_samples(samples: Path, clips_dir: Path, kind: str = "positive") -> None:
     if clips_dir.exists() and any(clips_dir.glob("*.wav")):
         print(f"using existing {clips_dir}")
         return
@@ -91,7 +91,7 @@ def unpack_samples(samples: Path, clips_dir: Path) -> None:
         for wav in samples.glob("*.wav"):
             shutil.copy(wav, clips_dir / wav.name)
     count = len(list(clips_dir.glob("*.wav")))
-    print(f"{count} positive samples in {clips_dir}")
+    print(f"{count} {kind} samples in {clips_dir}")
     if count == 0:
         sys.exit(f"no WAVs found in {samples}")
 
@@ -190,7 +190,7 @@ def download_data() -> None:
             future.result()
 
 
-def build_features(clips_dir: Path) -> None:
+def build_features(clips_dir: Path, output_dir: Path) -> None:
     from mmap_ninja.ragged import RaggedMmap
     from microwakeword.audio.augmentation import Augmentation
     from microwakeword.audio.clips import Clips
@@ -215,7 +215,6 @@ def build_features(clips_dir: Path) -> None:
         background_min_snr_db=-5, background_max_snr_db=10,
         min_jitter_s=0.195, max_jitter_s=0.205)
 
-    output_dir = Path("generated_augmented_features")
     for split in ["training", "validation", "testing"]:
         (output_dir / split).mkdir(parents=True, exist_ok=True)
         if split == "training":
@@ -243,7 +242,7 @@ def build_features(clips_dir: Path) -> None:
             batch_size=100)
 
 
-def write_config() -> None:
+def write_config(negatives: bool) -> None:
     import yaml
     config = {
         "window_step_ms": 10,
@@ -280,6 +279,13 @@ def write_config() -> None:
         "minimization_metric": None,
         "maximization_metric": "average_viable_recall",
     }
+    if negatives:
+        # Synthesized phrases the model must not wake on, augmented like the
+        # positives and cut the same way (keep the end of the clip).
+        config["features"].insert(1, {
+            "features_dir": "generated_negative_features",
+            "sampling_weight": 1.0, "penalty_weight": 1.0, "truth": False,
+            "truncation_strategy": "truncate_start", "type": "mmap"})
     with open("training_parameters.yaml", "w") as file:
         yaml.dump(config, file)
 
@@ -348,21 +354,29 @@ def main() -> None:
                         help="where to write ahoj_hugo.tflite/.json")
     parser.add_argument("--workdir", type=Path, default=Path("training_run"),
                         help="scratch directory for datasets and features")
+    parser.add_argument("--negatives", type=Path, default=None,
+                        help="negative sample directory or zip from generate_samples.py "
+                             "(--negatives-out), phrases the model must not wake on")
     parser.add_argument("--skip-download-data", action="store_true",
                         help="reuse previously downloaded augmentation/negative data")
     args = parser.parse_args()
 
     check_environment()
     samples = args.samples.resolve()
+    negatives = args.negatives.resolve() if args.negatives else None
     out_dir = args.out.resolve()
     args.workdir.mkdir(parents=True, exist_ok=True)
     os.chdir(args.workdir)
     unpack_samples(samples, Path("generated_samples"))
+    if negatives:
+        unpack_samples(negatives, Path("generated_negatives"), "negative")
 
     if not args.skip_download_data:
         download_data()
-    build_features(Path("generated_samples"))
-    write_config()
+    build_features(Path("generated_samples"), Path("generated_augmented_features"))
+    if negatives:
+        build_features(Path("generated_negatives"), Path("generated_negative_features"))
+    write_config(negatives is not None)
     train()
     package(out_dir)
 

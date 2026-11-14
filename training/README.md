@@ -15,7 +15,7 @@ generate_samples.py ──► samples/ahoj_hugo.zip ──► train_ahoj_hugo.py
 
 | file | purpose |
 |---|---|
-| `generate_samples.py` | Czech positive samples (Piper voices, edge-tts, macOS `say`, real recordings) |
+| `generate_samples.py` | Czech samples: "Ahoj Hugo" + "Ahoj Google" positives, optional negatives (Piper voices, edge-tts, macOS `say`, real recordings) |
 | `train_ahoj_hugo.py` | local training: downloads, augmentation, features, training, quantization, manifest |
 | `train_ahoj_hugo.ipynb` | the same pipeline as a Google Colab notebook (free GPU) |
 
@@ -142,26 +142,61 @@ Check the whole stack before committing hours to it:
 python3 -c "import microwakeword, tensorflow as tf, tensorboard, datasets, piper; print(tf.__version__, datasets.__version__)"
 ```
 
-## 2. Generate positive samples
+## 2. Generate samples
 
 ```bash
-python3 training/generate_samples.py --count 1000 --edge 300 --out samples/ahoj_hugo
+python3 training/generate_samples.py --count 1000 --multi 2000 --edge 300 --out samples/ahoj_hugo
 ```
 
-This synthesizes "Ahoj Hugo" (and variants: "Ahoj, Hugo.", "No ahoj, Hugo.", …) with the
-two Czech Piper voices (jirka, kasandra), randomizing pace and noise. Voices download to
-`samples/voices/` on the first run. The output is 16 kHz mono WAVs in `samples/ahoj_hugo/`
-plus `samples/ahoj_hugo.zip`.
+This synthesizes both wake phrases, split evenly: "Ahoj Hugo" and "Ahoj Google", each with
+variants ("Ahoj, Hugo.", "No ahoj, Google.", …). Speed, noise and pitch are randomized.
+Voices download to `samples/voices/` on the first run (about 700 MB for all of them). The
+output is 16 kHz mono WAVs in `samples/ahoj_hugo/` plus `samples/ahoj_hugo.zip`.
+
+The more different voices, the better the model copes with real people:
+
+- **`--count`** uses eight single-speaker Piper voices: Czech jirka (medium and low) and
+  kasandra, Slovak lili, and Polish darkman, gosia, mc_speech and bass. All of them get
+  Czech pronunciation. The Slovak and Polish voices add new timbres, and the Czech ones are
+  picked most often (7 in 12 samples).
+- **`--multi`** uses multi-speaker Piper models with Czech pronunciation: US English
+  LibriTTS-R (904 speakers) and British VCTK (109 speakers). Every sample gets a random
+  speaker, so 2000 samples cover about 900 different voices, all with an English accent.
+  German MLS (236 speakers) was tried and dropped: with Czech phonemes it babbles.
+- **Pitch shifting:** 30% of the synthesized samples are shifted up to 4 semitones up or
+  down (`--pitch-prob`, `--pitch-range`). Pitch and formants move together and the length
+  stays the same, so it sounds like a different, deeper or higher voice. This needs
+  ffmpeg.
+- **Spelling of "Google":** Czech text-to-speech reads "Google" letter by letter
+  ("go-og-le"), so Piper and `say` get the Czech spelling "Gůgl". edge-tts gets both
+  spellings.
 
 | option | adds | notes |
 |---|---|---|
-| `--count N` | N Piper samples (default 1000) | CPU only, runs on all cores |
+| `--count N` | N samples from the 8 single-speaker Piper voices (default 1000) | CPU only, runs on all cores |
+| `--multi N` | N samples from 1013 multi-speaker Piper voices (default 0) | the cheapest way to add many voices |
 | `--edge N` | N Microsoft edge-tts samples (Antonin/Vlasta neural voices) | needs internet; a second engine generalizes much better |
 | `--say N` | N macOS `say -v Zuzana` samples | macOS only, needs the Zuzana voice |
+| `--wake-words hugo google` | which phrases to generate (default both) | `--wake-words hugo` for "Ahoj Hugo" only |
+| `--pitch-prob P` / `--pitch-range S` | pitch/formant-shift a share P of samples by up to ±S semitones (default 0.3 / 4) | `--pitch-prob 0` turns it off |
+| `--negatives N --negative-phrase "…"` | N samples of phrases that must **not** wake the device | see below |
 | `--extra-wavs DIR` | your own recordings (any rate, resampled) | **worth far more than synthetic ones** |
 | `--seed N` | a different random variation | |
 | `--jobs N` | N parallel Piper worker processes (default: all CPU cores) | about 4× faster on 16 cores than one process |
 | `--edge-jobs N` | N parallel edge-tts requests (default 4) | raise carefully: Microsoft throttles bursts |
+
+**Negative samples** cut false wake-ups on phrases that sound close to the wake words.
+Name the phrases (repeat the option for several) and how many samples to make. They are
+split across Piper, multi-speaker and edge-tts in the same ratio as the positives, and are
+written to `samples/negatives/` (`--negatives-out`) plus a zip:
+
+```bash
+python3 training/generate_samples.py --count 1000 --multi 2000 --edge 300 \
+    --negatives 1000 --negative-phrase "Ahoj kluci." --negative-phrase "Ahoj Hubo."
+```
+
+Pass the zip to training with `--negatives samples/negatives.zip`. Don't use a phrase you
+want to wake on: "Ahoj Google" is a positive phrase here.
 
 Real recordings make the biggest difference. Record 20-50 takes of "Ahoj Hugo" from
 different distances, speeds and people, as WAVs in one folder, and pass
@@ -180,6 +215,8 @@ has no Czech voice checkpoints.
 ```bash
 export HF_TOKEN=hf_...      # optional: avoids Hugging Face rate limits, may unlock AudioSet
 python3 training/train_ahoj_hugo.py --samples samples/ahoj_hugo.zip
+# with negative samples from step 2:
+python3 training/train_ahoj_hugo.py --samples samples/ahoj_hugo.zip --negatives samples/negatives.zip
 ```
 
 Long runs: use `tmux`/`screen` on Ubuntu, and on macOS prefix the command with
@@ -194,7 +231,9 @@ The script works inside `training_run/` (`--workdir`) and writes the result to
 | room impulse responses (MIT) | `mit_rirs/` | ~6 MB |
 | background noise: AudioSet shard (skipped if unavailable) + FMA music | `audioset_16k/`, `fma/`, `fma_16k/` | ~0.5 GB |
 | negative speech and noise features (pre-computed by microWakeWord) | `negative_datasets/` | 25+ GB |
+| unpack negative samples (only with `--negatives`) | `generated_negatives/` | small |
 | augment the samples and compute spectrograms | `generated_augmented_features/` | small |
+| same for the negative samples (only with `--negatives`) | `generated_negative_features/` | small |
 | train `mixednet` (15k steps at lr 1e-3, then 5k at 1e-4), quantize to int8 | `trained_models/wakeword/` | small |
 | copy the quantized `.tflite`, write the manifest | `../ahoj_hugo_model/` | ~60 KB |
 
@@ -215,8 +254,9 @@ Follow the training curves in a second terminal:
   checkpoint is written only when validation improves, so a crashed run resumes from its
   best weights, not from the step where it stopped. The step counter isn't saved either:
   the resumed run goes through all 20,000 steps again, starting from those weights. To train
-  from scratch after changing your samples, delete `training_run/generated_samples` (the
-  samples are only unpacked when it is empty) and `training_run/trained_models`.
+  from scratch after changing your samples, delete `training_run/generated_samples` and
+  `training_run/generated_negatives` (samples are only unpacked into an empty folder) and
+  `training_run/trained_models`.
 - **An interrupted download restarts; an interrupted unzip or decode does not.** Files
   download to `*.part` and are renamed only when complete, so a cut-off zip is fetched again
   on the next run. Each negative dataset is skipped once its folder exists, though, and
@@ -238,8 +278,7 @@ commit, so a release is too old; install the dev branch into its own venv, which
 finds on its own:
 
 ```bash
-python3.12 -m venv .venv-esphome
-.venv-esphome/bin/pip install "https://github.com/esphome/esphome/archive/dev.zip"
+.venv/bin/pip install "https://github.com/esphome/esphome/archive/dev.zip"
 ```
 
 Then:
@@ -264,6 +303,8 @@ Expect a few rounds:
 |---|---|
 | misses wake-ups | lower the cutoff: `install … --cutoff 0.9` (the default in the manifest is 0.97) |
 | false triggers | raise the cutoff; retrain with more varied positives so the model needs less leeway |
+| false triggers on one similar phrase | add it as `--negatives N --negative-phrase "…"` and retrain with `--negatives` |
+| works for some voices only | add `--multi 2000` (or more) for many more speakers |
 | works for TTS, not for you | add real recordings with `--extra-wavs` and retrain |
 | works up close, not across the room | record takes from a distance; the RIR augmentation helps only so much |
 

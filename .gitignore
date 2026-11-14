@@ -7,3 +7,6 @@ firmware/secrets.yaml
 .venv-esphome/
 firmware/models/
 firmware/voice-pe-wake-words.yaml
+.venv
+samples
+training_run

@@ -101,6 +101,7 @@ keeps working while havoice is connected.
 | `cargo run --example wake_word -- list` | wake word models on the device, stored locally, and in ESPHome's online catalogue |
 | `cargo run --example wake_word -- verify <src>` | check a model the way the device does (catalogue name, URL, or local file) |
 | `cargo run --example wake_word -- install <src> [--flash]` | build verified models into the firmware; `--flash` uploads it over Wi-Fi |
+| `cargo run --example wake_word -- convert model.onnx --wake-word "..."` | inspect an ONNX model and try to convert it to a microWakeWord `.tflite` (needs `pip install onnx2tf tensorflow`) |
 | `cargo run --example wake_word -- listen` | print every wake word detection with its probabilities |
 
 ## Command-line tool
@@ -165,7 +166,13 @@ has, input int8 `[1, stride, 40]`, output uint8 `[1, 1]`, sensible manifest valu
 * Back to stock firmware: `wake_word remove <id> --flash`, or the
   [Voice PE web flasher](https://esphome.github.io/home-assistant-voice-pe/).
 
-Only microWakeWord models run on the device. openWakeWord / ONNX models have to be retrained with microWakeWord.
+Only microWakeWord models run on the device. An ONNX model (e.g. from openWakeWord) can be *converted*, not
+uploaded: the device has no runtime model API, and its interpreter only takes int8 TFLite. `wake_word convert
+model.onnx` reads the ONNX file (ops, shapes, weights - pure Rust), tells you how far the model is from a
+microWakeWord one, and runs [onnx2tf](https://github.com/PINTO0309/onnx2tf) (`pip install onnx2tf tensorflow`)
+to produce int8 `.tflite` candidates, each checked with the same rules as `verify`. A model that wasn't trained
+as a streaming microWakeWord network usually can't be converted into something that detects - retraining with
+the [microWakeWord training repo](https://github.com/esphome/micro-wake-word-models) is the reliable path.
 
 ## Linux and macOS
 
@@ -208,6 +215,7 @@ src/api.rs         connection, message fan-out, entities, error hints
 src/audio.rs       PCM, FLAC encoding, WAV reading
 src/tts.rs         say / espeak-ng, voices
 src/wake_word.rs   model checks (a small TFLite reader), firmware YAML, detections
+src/onnx.rs        ONNX reader + microWakeWord compatibility checks
 src/improv.rs      Wi-Fi setup over USB (Improv Serial)
 src/discover.rs    mDNS
 src/serial.rs      USB log

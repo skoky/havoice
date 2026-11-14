@@ -7,6 +7,7 @@
 //!     cargo run --example wake_word -- install alexa --flash      # ... then build and flash over Wi-Fi
 //!     cargo run --example wake_word -- remove alexa [--flash]
 //!     cargo run --example wake_word -- build [--flash]             # rebuild from firmware/models/
+//!     cargo run --example wake_word -- convert my.onnx --wake-word "Ahoj Hugo"   # ONNX -> .tflite
 //!     cargo run --example wake_word -- listen                     # print every detection
 //!
 //! A model source is a catalogue name (`alexa`, `hey_home_assistant`, ...), an http(s) URL of a
@@ -27,15 +28,23 @@
 //!
 //! Extra models switch on whenever an API client connects; in Home Assistant you can pick the
 //! active wake words on the device page as usual.
+//!
+//! `convert` takes an ONNX model (e.g. from openWakeWord) and tries to turn it into a
+//! microWakeWord `.tflite` with [onnx2tf](https://github.com/PINTO0309/onnx2tf) - needs
+//! `pip install onnx2tf tensorflow`. The device only runs streaming models trained on
+//! melspectrogram features, so a model that wasn't trained that way usually can't be converted
+//! into something that detects; `convert` reports how far it gets and checks every candidate
+//! it produces with the same rules as `verify`.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use clap::{Args, Parser, Subcommand};
 use havoice::device::load_env;
 use havoice::wake_word::{self, Detections, Firmware, Manifest, Report};
 use havoice::{VoicePe, discover};
+use havoice::{onnx, wake_word::Check};
 
 const CATALOGUE: &str =
     "https://raw.githubusercontent.com/esphome/micro-wake-word-models/main/models/v2";
@@ -90,6 +99,13 @@ enum Cmd {
         /// Build with the ESPHome CLI and upload over Wi-Fi
         #[arg(long)]
         flash: bool,
+    },
+    /// Try to convert an ONNX model into a microWakeWord .tflite (needs pip install onnx2tf tensorflow)
+    Convert {
+        /// Path to the .onnx file
+        path: PathBuf,
+        #[command(flatten)]
+        custom: Custom,
     },
     /// Print every wake word detection from the device log
     Listen,
@@ -171,6 +187,7 @@ async fn main() -> Result<()> {
             build(flash).await
         }
         Cmd::Build { flash } => build(flash).await,
+        Cmd::Convert { path, custom } => convert(&path, &custom).await,
         Cmd::Listen => listen().await,
     }
 }
@@ -372,6 +389,169 @@ async fn reconnect() -> Result<VoicePe> {
         }
     }
     Err(last.unwrap().context("device didn't come back within 90 s"))
+}
+
+// ------------------------------------------------------------------ onnx
+
+/// Inspect an ONNX model, run onnx2tf on it, and check every .tflite it produces.
+async fn convert(path: &Path, custom: &Custom) -> Result<()> {
+    let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+    let info = onnx::inspect_onnx(&bytes).context("not a readable ONNX model")?;
+    println!(
+        "{}: ONNX ir {}, producer {}, opsets {}",
+        path.display(),
+        info.ir_version,
+        if info.producer.is_empty() {
+            "?"
+        } else {
+            &info.producer
+        },
+        info.opsets
+            .iter()
+            .map(|(d, v)| format!("{}:{}", if d.is_empty() { "ai.onnx" } else { d }, v))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    println!(
+        "  ops: {}",
+        info.ops
+            .iter()
+            .map(|(op, n)| format!("{op}x{n}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    for t in info.inputs.iter().chain(&info.outputs) {
+        println!(
+            "  {} {} {:?}",
+            if info.inputs.contains(t) {
+                "in "
+            } else {
+                "out"
+            },
+            t.elem_type,
+            t.shape
+        );
+    }
+    println!(
+        "  {} weight tensor(s), {} kB\n",
+        info.initializers,
+        info.parameter_bytes / 1000
+    );
+    let onnx_checks = onnx::checks(&info);
+    print_checks(&onnx_checks);
+    let hopeless = onnx_checks.iter().any(|c| !c.ok && !c.warning);
+    ensure!(
+        !hopeless,
+        "this model can't become a microWakeWord model as it is - see the \u{2717} above"
+    );
+
+    check_onnx2tf().await?;
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "model".into());
+    let outdir = firmware_dir().join(format!("onnx2tf-{stem}"));
+    if outdir.exists() {
+        std::fs::remove_dir_all(&outdir)?;
+    }
+    println!(
+        "\nconverting with onnx2tf (int8 quantization) - its warnings are usually harmless ..."
+    );
+    let status = tokio::process::Command::new("onnx2tf")
+        .arg("-i")
+        .arg(path)
+        .arg("-o")
+        .arg(&outdir)
+        .arg("-oiqt")
+        .status()
+        .await
+        .context("running onnx2tf")?;
+    ensure!(status.success(), "onnx2tf failed - see its output above");
+
+    let mut candidates: Vec<PathBuf> = std::fs::read_dir(&outdir)?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "tflite"))
+        .collect();
+    candidates.sort_by_key(|p| {
+        let n = p.file_name().unwrap().to_string_lossy().to_lowercase();
+        (!n.contains("integer") && !n.contains("quant"), n.clone())
+    });
+    ensure!(
+        !candidates.is_empty(),
+        "onnx2tf produced no .tflite in {}",
+        outdir.display()
+    );
+
+    let esphome = esphome_version().await.ok();
+    let mut any_ok = false;
+    for c in &candidates {
+        let tflite = std::fs::read(c)?;
+        let manifest = apply(
+            bare_manifest(&c.file_name().unwrap().to_string_lossy(), custom)?,
+            custom,
+        );
+        let m = Model {
+            manifest,
+            tflite,
+            source: c.display().to_string(),
+        };
+        any_ok |= print_report(&m, &check(&m, esphome.as_deref()));
+    }
+    if any_ok {
+        let best = &candidates[0];
+        println!(
+            "a candidate passed - install it with:\n  cargo run --example wake_word -- install {} --wake-word \"{}\"",
+            best.display(),
+            custom
+                .wake_word
+                .clone()
+                .unwrap_or_else(|| "Your Phrase".into())
+        );
+        println!(
+            "\nconversion is lossy: say the phrase to the device afterwards and check\n  cargo run --example wake_word -- listen"
+        );
+    } else {
+        println!(
+            "no candidate passed the device's checks. Common reasons:\n\
+             - the model wasn't trained as a streaming microWakeWord network (most ONNX models aren't)\n\
+             - quantization needs real calibration audio: onnx2tf -cind <input_name>:<npy path>\n\
+             - an op can't be lowered to one of the 20 the device's interpreter has"
+        );
+    }
+    Ok(())
+}
+
+/// `python3 -c "import onnx2tf, tensorflow"`, with an actionable error.
+async fn check_onnx2tf() -> Result<()> {
+    match tokio::process::Command::new("python3")
+        .args(["-c", "import onnx2tf, tensorflow"])
+        .output()
+        .await
+    {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            bail!("python3 not found - onnx2tf runs through Python")
+        }
+        Err(e) => bail!(e),
+        Ok(out) if out.status.success() => Ok(()),
+        Ok(_) => bail!(
+            "onnx2tf/tensorflow not importable - install them with:\n  pip install onnx2tf tensorflow"
+        ),
+    }
+}
+
+/// Print checks with the same marks as `print_report`.
+fn print_checks(checks: &[Check]) {
+    for c in checks {
+        let mark = if c.ok {
+            "\u{2713}"
+        } else if c.warning {
+            "!"
+        } else {
+            "\u{2717}"
+        };
+        println!("  {mark} {}", c.what);
+    }
 }
 
 // ------------------------------------------------------------------ models

@@ -38,8 +38,9 @@ multiply by 40. If that comes out at more than a night, use Colab.
 
 ## Requirements
 
-- **Python 3.12** for training. TensorFlow has no wheels for 3.13+, and microWakeWord needs
-  3.10+. Sample generation alone works on 3.9-3.12.
+- **Python 3.12 or 3.14.** microWakeWord needs 3.10+. Python 3.14 is tested on Ubuntu 26.04
+  with an NVIDIA GPU. There TensorFlow comes from the 2.22 release candidate, the first build
+  with 3.14 wheels. Sample generation works on 3.9 and newer.
 - **ffmpeg** (recommended): resamples TTS output to 16 kHz. Without it the scripts fall back
   to scipy.
 - **git**, plus **Rust/cargo** to verify and install the model with havoice.
@@ -50,17 +51,18 @@ multiply by 40. If that comes out at more than a night, use Colab.
 
 ### Ubuntu
 
+Ubuntu 26.04 ships Python 3.14:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip ffmpeg git build-essential
+```
+
 Ubuntu 24.04 ships Python 3.12:
 
 ```bash
 sudo apt update
 sudo apt install -y python3.12 python3.12-venv python3-pip ffmpeg git build-essential
-```
-
-On Ubuntu 22.04, get 3.12 from the deadsnakes PPA first:
-
-```bash
-sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt install -y python3.12 python3.12-venv
 ```
 
 For a GPU you need only a working NVIDIA driver (`nvidia-smi` lists the card). The CUDA and
@@ -82,7 +84,8 @@ Content → System voice → Manage Voices…*, add **Zuzana** under Czech, then
 
 ## 1. Set up the environment
 
-A single venv covers both sample generation and training:
+A single venv covers both sample generation and training. On Ubuntu 26.04 create it with
+`python3 -m venv .venv` (Python 3.14). Elsewhere use 3.12:
 
 ```bash
 python3.12 -m venv .venv
@@ -94,7 +97,10 @@ python3 -m pip install -e ./microWakeWord
 ```
 
 - `datasets<4`: version 4 changed audio decoding and breaks the download steps. The script
-  refuses to start with it installed.
+  refuses to start with it installed. On Python 3.14, `datasets` 3.x hashing crashes with
+  `TypeError: Pickler._batch_setitems() takes 2 positional arguments but 3 were given`.
+  `train_ahoj_hugo.py` patches this at startup, so keep the pinned `dill`/`multiprocess`
+  versions that `datasets` installs. Upgrading them doesn't help.
 - `tensorboard`: microWakeWord uses `tf.summary` but doesn't declare the dependency. Without
   it, training crashes at the first evaluation with
   `TBNotInstalledError: TensorBoard is not installed`, after all the downloads and feature
@@ -109,8 +115,26 @@ python3 -m pip install 'tensorflow[and-cuda]'
 python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 
+On Python 3.14, pip picks `tensorflow` 2.22.0rc0 by itself: no stable release has 3.14
+wheels yet, and `--pre` isn't needed. On Ubuntu 26.04 it finds the GPU with the cuDNN that
+`[and-cuda]` installs.
+
 An empty list means training will run on the CPU. That usually comes down to the driver: it
 must be recent enough for the CUDA version TensorFlow ships with.
+
+A 4 GB GPU (for example a laptop RTX 500) is enough. microWakeWord's validation passes the
+whole ambient validation set to `model.evaluate()` at once, and Keras copies it to the GPU in
+one piece. On a small card that fails at the first evaluation (step 500) with
+`InternalError: Failed copying input tensor from CPU:0 to GPU:0 ... Dst tensor is not
+initialized`. `train_ahoj_hugo.py` therefore runs training through `training/mww_train.py`,
+which feeds those arrays to the GPU batch by batch and turns on GPU memory growth. The
+metrics are the same as Keras' own `evaluate()`, and microWakeWord stays unmodified.
+
+Validation is also the step that needs the most RAM: the ambient set is about 3.8 GB as
+float32. With `mww_train.py` the training process stays at about 6.5 GB for the whole run.
+An earlier version of the launcher used `tf.data.Dataset.from_generator`, which kept every
+validation set alive. It added 3.8 GB per evaluation, so the kernel killed training
+(`died with <Signals.SIGKILL: 9>`) at about step 8500 on a 64 GB machine.
 
 Check the whole stack before committing hours to it:
 
@@ -131,11 +155,13 @@ plus `samples/ahoj_hugo.zip`.
 
 | option | adds | notes |
 |---|---|---|
-| `--count N` | N Piper samples (default 1000) | CPU only, a few minutes |
+| `--count N` | N Piper samples (default 1000) | CPU only, runs on all cores |
 | `--edge N` | N Microsoft edge-tts samples (Antonin/Vlasta neural voices) | needs internet; a second engine generalizes much better |
 | `--say N` | N macOS `say -v Zuzana` samples | macOS only, needs the Zuzana voice |
 | `--extra-wavs DIR` | your own recordings (any rate, resampled) | **worth far more than synthetic ones** |
 | `--seed N` | a different random variation | |
+| `--jobs N` | N parallel Piper worker processes (default: all CPU cores) | about 4× faster on 16 cores than one process |
+| `--edge-jobs N` | N parallel edge-tts requests (default 4) | raise carefully: Microsoft throttles bursts |
 
 Real recordings make the biggest difference. Record 20-50 takes of "Ahoj Hugo" from
 different distances, speeds and people, as WAVs in one folder, and pass
@@ -180,17 +206,24 @@ Follow the training curves in a second terminal:
 
 ### Re-running and resuming
 
+- The four download steps (RIRs, AudioSet, FMA, negative datasets) run at the same time,
+  and the four negative zips download in parallel, so their progress lines interleave.
 - Downloads are skipped once their target folder has content, so a second run starts almost
   straight away at feature generation. `--skip-download-data` skips the download stage
   completely.
-- Training restores the newest checkpoint from `trained_models/wakeword/restore/`. To train
+- Training restores the newest checkpoint from `trained_models/wakeword/restore/`. A
+  checkpoint is written only when validation improves, so a crashed run resumes from its
+  best weights, not from the step where it stopped. The step counter isn't saved either:
+  the resumed run goes through all 20,000 steps again, starting from those weights. To train
   from scratch after changing your samples, delete `training_run/generated_samples` (the
   samples are only unpacked when it is empty) and `training_run/trained_models`.
-- **An interrupted download is not repaired.** Files are only checked for existence, and
-  `negative_datasets/` is skipped as soon as the folder exists. If the first run stopped
-  while downloading or unzipping, delete the incomplete pieces before running again:
+- **An interrupted download restarts; an interrupted unzip or decode does not.** Files
+  download to `*.part` and are renamed only when complete, so a cut-off zip is fetched again
+  on the next run. Each negative dataset is skipped once its folder exists, though, and
+  `fma_16k/`, `audioset_16k/` and `mit_rirs/` once they hold any WAV. If the first run
+  stopped while unzipping or converting, delete the incomplete pieces before running again:
   ```bash
-  rm -rf training_run/negative_datasets   # if a zip is missing or its folder is absent
+  rm -rf training_run/negative_datasets/speech   # any half-extracted folder
   rm -rf training_run/fma training_run/fma_16k
   ```
   `ls training_run/negative_datasets` should show four zips and four folders:

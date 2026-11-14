@@ -10,12 +10,21 @@ optionally mixed with Microsoft edge-tts and macOS `say` for extra variety.
     python3 training/generate_samples.py --count 1000 --out samples/ahoj_hugo
     python3 training/generate_samples.py --edge 300 --say 100
     python3 training/generate_samples.py --extra-wavs ../oww_rs/crates/oww/test_data
+    python3 training/generate_samples.py --jobs 8 --edge-jobs 4
+
+Piper samples are synthesized in parallel worker processes (--jobs, default:
+all CPU cores) and edge-tts/say calls run in parallel threads. Each sample's
+voice, phrase, speed and noise settings are drawn up front from --seed, so they
+don't depend on the job count. Piper adds its own unseeded noise on top, so
+the files differ slightly between runs, as they always have.
 
 Output is 16 kHz mono 16-bit WAVs (what the microWakeWord feature pipeline
 expects) plus a ready-to-upload zip for training/train_ahoj_hugo.ipynb.
 """
 
 import argparse
+import importlib.util
+import os
 import platform
 import random
 import shutil
@@ -23,6 +32,7 @@ import subprocess
 import sys
 import urllib.request
 import wave
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 
 HUGGINGFACE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
@@ -40,7 +50,9 @@ def download(url: str, dest: Path) -> None:
         return
     print(f"downloading {url}")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    urllib.request.urlretrieve(url, dest)
+    part = dest.with_name(dest.name + ".part")
+    urllib.request.urlretrieve(url, part)
+    part.rename(dest)
 
 
 def resample_to_16k(src: Path, dst: Path) -> None:
@@ -68,57 +80,84 @@ def resample_to_16k(src: Path, dst: Path) -> None:
 def ensure_voice(name: str, cache: Path) -> tuple[Path, Path]:
     onnx = cache / f"cs_CZ-{name}-medium.onnx"
     config = onnx.with_suffix(".onnx.json")
-    download(VOICES[name], onnx)
-    download(VOICES[name] + ".json", config)
+    with ThreadPoolExecutor(2) as pool:
+        list(pool.map(download, [VOICES[name], VOICES[name] + ".json"], [onnx, config]))
     return onnx, config
 
 
-def piper_voices(cache: Path):
+def check_piper() -> None:
     try:
-        from piper import PiperVoice
+        import piper  # noqa: F401
     except ImportError:
         sys.exit("piper-tts is missing: python3 -m pip install piper-tts")
-    loaded = []
-    for name in VOICES:
-        onnx, config = ensure_voice(name, cache)
-        loaded.append((PiperVoice.load(str(onnx), str(config)), name))
-    return loaded
 
 
-def synth_piper(voice, text: str, tmp: Path, rng: random.Random) -> None:
+_worker_voices: dict = {}
+
+
+def init_piper_worker(voice_files: dict[str, tuple[Path, Path]]) -> None:
+    """Load every Piper voice once per worker process, single-threaded so N
+    workers use N cores instead of fighting over onnxruntime's thread pool."""
+    import onnxruntime
+    from piper import PiperVoice
+
+    options = onnxruntime.SessionOptions()
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
+    for name, (onnx, config) in voice_files.items():
+        voice = PiperVoice.load(str(onnx), str(config))
+        voice.session = onnxruntime.InferenceSession(
+            str(onnx), sess_options=options, providers=["CPUExecutionProvider"])
+        _worker_voices[name] = voice
+
+
+def piper_job(job: tuple) -> None:
     from piper import SynthesisConfig
 
+    voice_name, text, length_scale, noise_scale, noise_w_scale, tmp, out = job
     config = SynthesisConfig(
-        length_scale=rng.uniform(0.65, 1.4),
-        noise_scale=rng.uniform(0.5, 0.8),
-        noise_w_scale=rng.uniform(0.6, 1.0),
-    )
+        length_scale=length_scale, noise_scale=noise_scale, noise_w_scale=noise_w_scale)
     with wave.open(str(tmp), "wb") as wav:
-        voice.synthesize_wav(text, wav, syn_config=config)
+        _worker_voices[voice_name].synthesize_wav(text, wav, syn_config=config)
+    resample_to_16k(tmp, out)
+    tmp.unlink()
 
-def synth_edge(text: str, tmp_mp3: Path, rng: random.Random) -> bool:
-    if not shutil.which("edge-tts") and not shutil.which("edge_tts"):
-        return False
-    voice = rng.choice(EDGE_VOICES)
-    rate = f"{rng.randint(-35, 35):+d}%"
-    pitch = f"{rng.randint(-15, 15):+d}Hz"
+
+def edge_command() -> list[str] | None:
+    """Prefer the edge_tts module of this interpreter, so it works from an
+    unactivated venv where `edge-tts` is not on PATH."""
+    if importlib.util.find_spec("edge_tts"):
+        return [sys.executable, "-m", "edge_tts"]
+    found = shutil.which("edge-tts")
+    return [found] if found else None
+
+
+def edge_job(job: tuple) -> bool:
+    command, text, voice, rate, pitch, tmp_mp3, out = job
     result = subprocess.run(
-        ["edge-tts", "--voice", voice, "--text", text,
-         f"--rate={rate}"   , f"--pitch={pitch}", "--write-media", str(tmp_mp3)],
+        [*command, "--voice", voice, "--text", text,
+         f"--rate={rate}", f"--pitch={pitch}", "--write-media", str(tmp_mp3)],
         capture_output=True,
     )
-    return result.returncode == 0 and tmp_mp3.exists()
-
-
-def synth_say(text: str, out: Path, rng: random.Random) -> bool:
-    if platform.system() != "Darwin":
+    if result.returncode != 0 or not tmp_mp3.exists():
         return False
+    resample_to_16k(tmp_mp3, out)
+    tmp_mp3.unlink()
+    return True
+
+
+def say_job(job: tuple) -> bool:
+    text, rate, tmp, out = job
     result = subprocess.run(
-        ["say", "-v", "Zuzana", "-r", str(rng.randint(160, 210)),
-         "-o", str(out), "--data-format=LEI16@16000", text],
+        ["say", "-v", "Zuzana", "-r", str(rate),
+         "-o", str(tmp), "--data-format=LEI16@16000", text],
         capture_output=True,
     )
-    return result.returncode == 0 and out.exists()
+    if result.returncode != 0 or not tmp.exists():
+        return False
+    resample_to_16k(tmp, out)
+    tmp.unlink()
+    return True
 
 
 def fold_in_extra_wavs(directory: Path, out_dir: Path) -> int:
@@ -144,6 +183,10 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("samples/ahoj_hugo"))
     parser.add_argument("--voice-cache", type=Path, default=Path("samples/voices"))
     parser.add_argument("--seed", type=int, default=2024)
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
+                        help="parallel Piper worker processes (default: all CPU cores)")
+    parser.add_argument("--edge-jobs", type=int, default=4,
+                        help="parallel edge-tts requests (default 4; more risks throttling)")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -151,31 +194,56 @@ def main() -> None:
     tmp = args.out.parent / "tmp"
     tmp.mkdir(exist_ok=True)
 
-    voices = piper_voices(args.voice_cache)
+    # Draw every random parameter up front, in the same order as the old
+    # sequential loop, so they depend only on --seed and not on scheduling.
+    voice_names = list(VOICES)
+    piper_jobs = []
     for i in range(args.count):
-        voice, _ = rng.choice(voices)
+        voice_name = rng.choice(voice_names)
         text = rng.choice(PHRASES)
-        raw = tmp / "raw.wav"
-        synth_piper(voice, text, raw, rng)
-        resample_to_16k(raw, args.out / f"{i:05d}.wav")
-        if (i + 1) % 100 == 0:
-            print(f"{i + 1}/{args.count} Piper samples")
+        piper_jobs.append((voice_name, text, rng.uniform(0.65, 1.4), rng.uniform(0.5, 0.8),
+                           rng.uniform(0.6, 1.0), tmp / f"piper_{i:05d}.wav",
+                           args.out / f"{i:05d}.wav"))
+    edge_jobs = [(rng.choice(PHRASES), rng.choice(EDGE_VOICES), f"{rng.randint(-35, 35):+d}%",
+                  f"{rng.randint(-15, 15):+d}Hz", tmp / f"edge_{i:05d}.mp3",
+                  args.out / f"edge_{i:05d}.wav") for i in range(args.edge)]
+    say_jobs = [(rng.choice(PHRASES), rng.randint(160, 210), tmp / f"say_{i:05d}.wav",
+                 args.out / f"say_{i:05d}.wav") for i in range(args.say)]
 
-    for i in range(args.edge):
-        text = rng.choice(PHRASES)
-        mp3 = tmp / "edge.mp3"
-        if not synth_edge(text, mp3, rng):
+    if piper_jobs:
+        check_piper()
+        with ThreadPoolExecutor(len(VOICES)) as pool:
+            voice_files = dict(zip(VOICES, pool.map(
+                lambda name: ensure_voice(name, args.voice_cache), VOICES)))
+        jobs = max(1, min(args.jobs, len(piper_jobs)))
+        print(f"synthesizing {len(piper_jobs)} Piper samples with {jobs} worker(s)")
+        with ProcessPoolExecutor(jobs, initializer=init_piper_worker,
+                                 initargs=(voice_files,)) as pool:
+            for done, _ in enumerate(pool.map(piper_job, piper_jobs, chunksize=4), 1):
+                if done % 100 == 0 or done == len(piper_jobs):
+                    print(f"{done}/{len(piper_jobs)} Piper samples")
+
+    if edge_jobs:
+        command = edge_command()
+        if not command:
             print("edge-tts not usable - install it with `python3 -m pip install edge-tts`")
-            break
-        resample_to_16k(mp3, args.out / f"edge_{i:05d}.wav")
+        else:
+            with ThreadPoolExecutor(max(1, args.edge_jobs)) as pool:
+                ok = sum(pool.map(edge_job, [(command, *job) for job in edge_jobs]))
+            print(f"{ok}/{len(edge_jobs)} edge-tts samples")
+            if ok < len(edge_jobs):
+                print("some edge-tts requests failed (network or throttling); "
+                      "try a lower --edge-jobs")
 
-    for i in range(args.say):
-        text = rng.choice(PHRASES)
-        wav = tmp / "say.wav"
-        if not synth_say(text, wav, rng):
-            print("say -v Zuzana not usable - add the Czech voice in System Settings")
-            break
-        resample_to_16k(wav, args.out / f"say_{i:05d}.wav")
+    if say_jobs:
+        if platform.system() != "Darwin":
+            print("say is macOS only - skipping --say")
+        else:
+            with ThreadPoolExecutor(os.cpu_count() or 1) as pool:
+                ok = sum(pool.map(say_job, say_jobs))
+            print(f"{ok}/{len(say_jobs)} say samples")
+            if ok == 0:
+                print("say -v Zuzana not usable - add the Czech voice in System Settings")
 
     if args.extra_wavs:
         folded = fold_in_extra_wavs(args.extra_wavs, args.out)

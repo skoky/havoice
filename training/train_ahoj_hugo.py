@@ -24,8 +24,10 @@ import sys
 import tarfile
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
 NEGATIVE_URL = "https://huggingface.co/datasets/kahrendt/microwakeword/resolve/main/"
 NEGATIVES = ["dinner_party.zip", "dinner_party_eval.zip",
              "no_speech.zip", "speech.zip"]
@@ -50,6 +52,31 @@ def check_environment() -> None:
     if int(datasets.__version__.split(".")[0]) >= 4:
         sys.exit(f"datasets {datasets.__version__} breaks audio decoding; "
                  "install 'datasets<4'")
+    patch_datasets_pickler()
+
+
+def patch_datasets_pickler() -> None:
+    """datasets<4 overrides Pickler._batch_setitems(self, items), but Python
+    3.14's pickle calls it with an extra `obj` argument, so hashing any dict
+    (e.g. inside load_dataset) fails with a TypeError. Accept and forward it."""
+    import inspect
+    from datasets.utils import _dill
+    if sys.version_info < (3, 14):
+        return
+    if "obj" in inspect.signature(_dill.Pickler._batch_setitems).parameters:
+        return
+
+    def _batch_setitems(self, items, obj=None):
+        if not self._legacy_no_dict_keys_sorting:
+            # Ignore the order of keys in a dict (same as datasets' own override)
+            try:
+                items = sorted(items)
+            except Exception:
+                from datasets.fingerprint import Hasher
+                items = sorted(items, key=lambda x: Hasher.hash(x[0]))
+        _dill.dill.Pickler._batch_setitems(self, items, obj)
+
+    _dill.Pickler._batch_setitems = _batch_setitems
 
 
 def unpack_samples(samples: Path, clips_dir: Path) -> None:
@@ -74,7 +101,12 @@ def download(url: str, dest: Path) -> None:
         return
     print(f"downloading {url}")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    urllib.request.urlretrieve(url, dest)
+    # Write to .part first so an interrupted download is never mistaken for a
+    # finished one on the next run.
+    part = dest.with_name(dest.name + ".part")
+    urllib.request.urlretrieve(url, part)
+    part.rename(dest)
+    print(f"downloaded {dest}")
 
 
 def write_wav(path: Path, rate: int, samples) -> None:
@@ -92,7 +124,7 @@ def download_rirs(out_dir: Path) -> None:
     rirs = datasets.load_dataset(
         "davidscripka/MIT_environmental_impulse_responses",
         split="train", streaming=True)
-    for row in tqdm(rirs, desc="MIT RIRs"):
+    for row in tqdm(rirs, desc="MIT RIRs", position=0):
         name = row['audio']['path'].split('/')[-1]
         write_wav(out_dir / name, 16000, row['audio']['array'])
 
@@ -107,7 +139,7 @@ def download_audioset(out_dir: Path) -> None:
         shard = datasets.load_dataset(
             "parquet", data_files=AUDIOSET_SHARD, split="train",
             streaming=True).cast_column("audio", datasets.Audio(sampling_rate=16000))
-        for row in tqdm(shard, desc="AudioSet"):
+        for row in tqdm(shard, desc="AudioSet", position=1):
             name = row['audio']['path'].split('/')[-1].rsplit(".", 1)[0] + ".wav"
             write_wav(out_dir / name, 16000, row['audio']['array'])
     except Exception as error:
@@ -126,19 +158,36 @@ def download_fma(out_dir: Path) -> None:
     files = datasets.Dataset.from_dict(
         {"audio": [str(i) for i in Path("fma/fma_small").glob("**/*.mp3")]})
     files = files.cast_column("audio", datasets.Audio(sampling_rate=16000))
-    for row in tqdm(files, desc="FMA"):
+    for row in tqdm(files, desc="FMA", position=2):
         name = row['audio']['path'].split('/')[-1].replace(".mp3", ".wav")
         write_wav(out_dir / name, 16000, row['audio']['array'])
 
 
 def download_negatives(out_dir: Path) -> None:
-    if out_dir.exists():
-        return
     out_dir.mkdir(parents=True, exist_ok=True)
-    for name in NEGATIVES:
+
+    def fetch(name: str) -> None:
+        if (out_dir / name.removesuffix(".zip")).is_dir():
+            return
         download(NEGATIVE_URL + name, out_dir / name)
         with zipfile.ZipFile(out_dir / name) as archive:
             archive.extractall(out_dir)
+
+    with ThreadPoolExecutor(len(NEGATIVES)) as pool:
+        for future in [pool.submit(fetch, name) for name in NEGATIVES]:
+            future.result()
+
+
+def download_data() -> None:
+    """The four sources are independent, so fetch them all at once: the
+    downloads overlap and the decoding of one overlaps the network wait of
+    another."""
+    steps = [(download_rirs, "mit_rirs"), (download_audioset, "audioset_16k"),
+             (download_fma, "fma_16k"), (download_negatives, "negative_datasets")]
+    with ThreadPoolExecutor(len(steps)) as pool:
+        futures = [pool.submit(step, Path(directory)) for step, directory in steps]
+        for future in futures:
+            future.result()
 
 
 def build_features(clips_dir: Path) -> None:
@@ -237,7 +286,9 @@ def write_config() -> None:
 
 def train() -> None:
     subprocess.run(
-        [sys.executable, "-m", "microwakeword.model_train_eval",
+        # mww_train.py runs microwakeword.model_train_eval with validation
+        # batched from host memory, so it fits on small (4 GB) GPUs.
+        [sys.executable, str(SCRIPT_DIR / "mww_train.py"),
          "--training_config=training_parameters.yaml",
          "--train", "1", "--restore_checkpoint", "1",
          "--test_tf_nonstreaming", "0",
@@ -309,10 +360,7 @@ def main() -> None:
     unpack_samples(samples, Path("generated_samples"))
 
     if not args.skip_download_data:
-        download_rirs(Path("mit_rirs"))
-        download_audioset(Path("audioset_16k"))
-        download_fma(Path("fma_16k"))
-        download_negatives(Path("negative_datasets"))
+        download_data()
     build_features(Path("generated_samples"))
     write_config()
     train()

@@ -571,7 +571,8 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--layer-size", type=int, default=32,
                         help="units per layer; 32 matches the assistant's current model")
-    parser.add_argument("--max-negative-weight", type=float, default=30.0)
+    parser.add_argument("--max-negative-weight", type=float, default=300.0,
+                        help="final weight of negatives vs positives (default 300)")
     parser.add_argument("--threshold", type=float, default=0.5,
                         help="the assistant's detection_threshold (config.rs default 0.5)")
     parser.add_argument("--target-false-per-hour", type=float, default=0.5,

@@ -224,6 +224,11 @@ python3 training/train_ahoj_hugo.py --samples samples/ahoj_hugo.zip
 python3 training/train_ahoj_hugo.py --samples samples/ahoj_hugo.zip --negatives samples/negatives.zip
 ```
 
+This builds both models: `ahoj_hugo_model/ahoj_hugo.onnx` for the Hugo assistant first
+(about 40 minutes the first time; a few minutes when the samples are unchanged), then the `.tflite` for the Voice PE
+(hours). `--onnx-only` or `--no-onnx` builds just one. Details on the ONNX model are in
+[ONNX model for the Hugo assistant](#onnx-model-for-the-hugo-assistant) below.
+
 Long runs: use `tmux`/`screen` on Ubuntu, and on macOS prefix the command with
 `caffeinate -i` so the Mac doesn't sleep.
 
@@ -247,6 +252,58 @@ Follow the training curves in a second terminal:
 ```bash
 .venv/bin/tensorboard --logdir training_run/trained_models/wakeword/logs
 ```
+
+### ONNX model for the Hugo assistant
+
+The assistant (`backend/unlock` in the hugo repo) runs openWakeWord through tract:
+`melspectrogram.onnx` → `embedding_model.onnx` → a small classifier, `ahoj_hugo.onnx`, which
+takes `[1, 16, 96]` and returns `[1, 1]`. `train_oww.py` trains only that classifier. It
+exports the same architecture and operators as the assistant's current model (openWakeWord's
+DNN: two 32-unit layers with layer norm, opset 13), so it is a drop-in replacement:
+
+```bash
+cp ahoj_hugo_model/ahoj_hugo.onnx ~/mywork/hugo/assistant/backend/unlock/speech_models/ahoj_hugo.onnx
+```
+
+The assistant embeds the model at build time, so rebuild it afterwards.
+
+- **Features match the assistant, not the openWakeWord package.** The assistant runs the
+  spectrogram model on each 80 ms chunk on its own, so it gets 5 frames per chunk instead of
+  openWakeWord's 8. `train_oww.py` computes features exactly that way. A Rust/tract replica
+  of `audio.rs` produced the same features (median difference 0.00001). For the same
+  reason openWakeWord's precomputed negative sets can't be used here.
+- **Assistant checkout.** With `--assistant DIR` (default `~/mywork/hugo/assistant` when it
+  exists) it uses the assistant's own feature models and, at the end, runs the recordings in
+  `backend/unlock/testing_data` through the new model the way `model_tests.rs` does. It
+  prints ok or FAIL per file. Without a checkout it downloads the identical feature models
+  from openWakeWord's v0.5.1 release.
+- **Negatives.** FLEURS Czech read speech (8.4 h, CC-BY-4.0, 1.6 GB download into
+  `training_run/oww/`), FLEURS speech over FMA music, FMA music, and synthetic noise. Also the
+  lead-in before every positive phrase (the same background without the phrase, including
+  the assistant's zero-filled start-up windows), the first half of every phrase ("Ahoj…"
+  alone must not fire), and `--negatives`.
+- **Validation** uses the assistant's decision rule (threshold 0.5, at least 3 hits in the
+  last 12 chunks, 2 s refractory). It measures recall on held-out samples and false wake-ups
+  per hour on FLEURS dev (1 h). The best checkpoint is the highest recall at or below
+  `--target-false-per-hour` (default 0.5); if none reaches it, the fewest false wake-ups.
+- **Caches.** Negative features (about 17 minutes to compute) and positive features are
+  cached in `training_run/oww/`. Training alone takes about 3 minutes.
+
+First results with the 3300 samples from step 2 (1000 single-speaker, 2000 multi-speaker,
+300 edge-tts):
+
+| model | threshold | recall | false wake-ups/h | assistant tests |
+|---|---|---|---|---|
+| assistant's current `ahoj_hugo.onnx` | 0.5 | 23% | 0 | 9/9 |
+| new | 0.5 | 85% | 5 | 8/9 |
+| new | 0.9 | 75% | 1 | |
+| new | 0.95 | 72% | 0 | |
+
+Recall counts "Ahoj Google" too, which the current model was never trained on. The new
+model reacts strongly to near-miss phrases: "Ahoj UFO" scores 1.00 at its end, and
+`short_silence.wav` (two short spoken phrases) fails. More real speech negatives and
+near-miss phrases as `--negatives` are the next things to add. Raising the assistant's
+`detection_threshold` trades recall for fewer false wake-ups without retraining.
 
 ### Re-running and resuming
 

@@ -206,31 +206,31 @@ fn tensor_type(t: i8) -> &'static str {
 }
 
 /// Minimal read-only flatbuffer access - just enough of the TFLite schema.
-struct Fb<'a>(&'a [u8]);
+pub(crate) struct Fb<'a>(pub(crate) &'a [u8]);
 
 impl<'a> Fb<'a> {
-    fn u32(&self, at: usize) -> Result<u32> {
+    pub(crate) fn u32(&self, at: usize) -> Result<u32> {
         let b = self
             .0
             .get(at..at + 4)
             .ok_or_else(|| anyhow!("truncated file"))?;
         Ok(u32::from_le_bytes(b.try_into().unwrap()))
     }
-    fn i32(&self, at: usize) -> Result<i32> {
+    pub(crate) fn i32(&self, at: usize) -> Result<i32> {
         Ok(self.u32(at)? as i32)
     }
-    fn u16(&self, at: usize) -> Result<u16> {
+    pub(crate) fn u16(&self, at: usize) -> Result<u16> {
         let b = self
             .0
             .get(at..at + 2)
             .ok_or_else(|| anyhow!("truncated file"))?;
         Ok(u16::from_le_bytes(b.try_into().unwrap()))
     }
-    fn i8(&self, at: usize) -> Result<i8> {
+    pub(crate) fn i8(&self, at: usize) -> Result<i8> {
         Ok(*self.0.get(at).ok_or_else(|| anyhow!("truncated file"))? as i8)
     }
     /// Absolute position of field `n` of the table at `table`, if present.
-    fn field(&self, table: usize, n: usize) -> Result<Option<usize>> {
+    pub(crate) fn field(&self, table: usize, n: usize) -> Result<Option<usize>> {
         let vtable = (table as i64 - self.i32(table)? as i64) as usize;
         let vt_len = self.u16(vtable)? as usize;
         let slot = 4 + 2 * n;
@@ -241,11 +241,11 @@ impl<'a> Fb<'a> {
         Ok((off != 0).then_some(table + off))
     }
     /// Follow an offset stored at `at` (to a table, vector or string).
-    fn deref(&self, at: usize) -> Result<usize> {
+    pub(crate) fn deref(&self, at: usize) -> Result<usize> {
         Ok(at + self.u32(at)? as usize)
     }
     /// (start, len) of the vector referenced by field `n`.
-    fn vector(&self, table: usize, n: usize) -> Result<Option<(usize, usize)>> {
+    pub(crate) fn vector(&self, table: usize, n: usize) -> Result<Option<(usize, usize)>> {
         match self.field(table, n)? {
             None => Ok(None),
             Some(f) => {
@@ -254,13 +254,13 @@ impl<'a> Fb<'a> {
             }
         }
     }
-    fn tables(&self, table: usize, n: usize) -> Result<Vec<usize>> {
+    pub(crate) fn tables(&self, table: usize, n: usize) -> Result<Vec<usize>> {
         let Some((start, len)) = self.vector(table, n)? else {
             return Ok(vec![]);
         };
         (0..len).map(|i| self.deref(start + 4 * i)).collect()
     }
-    fn ints(&self, table: usize, n: usize) -> Result<Vec<i32>> {
+    pub(crate) fn ints(&self, table: usize, n: usize) -> Result<Vec<i32>> {
         let Some((start, len)) = self.vector(table, n)? else {
             return Ok(vec![]);
         };

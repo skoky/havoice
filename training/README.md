@@ -333,7 +333,53 @@ near-miss phrases as `--negatives` are the next things to add. Raising the assis
 - An empty `audioset_16k/` means AudioSet couldn't be fetched. Training continues with FMA
   only; setting `HF_TOKEN` may help on the next run.
 
-## 4. Verify and flash with havoice
+## 4. Test on your recordings
+
+Before flashing, run both models over a folder of WAVs and get a success rate:
+
+```bash
+cargo run --release --example test_wavs -- samples/extra
+```
+
+```
+oww_AHOJ_HUGO_masek2_87_…wav   tflite DETECTED avg 1.00 peak 1.00 @2.08s   onnx DETECTED avg 1.00 peak 1.00 @1.96s
+oww_AHOJ_HUGO_old_88_…wav      tflite MISSED   avg 0.00 peak 0.05          onnx DETECTED avg 1.00 peak 1.00 @1.56s
+…
+tflite detected 15/35 = 42.9%   (cutoff 0.97, window 5)
+onnx   detected 35/35 = 100.0%   (threshold 0.50, min positive 2)
+```
+
+It runs each model the way it runs for real, in Rust, with no Python involved:
+
+- **`.tflite`**: the Voice PE's audio frontend and int8 kernels, ported from the firmware's
+  C code and checked to give identical numbers (the features match the device's frontend
+  on 17,000+ slices; the probabilities match TensorFlow Lite's reference kernels on
+  1,900 calls). Then the firmware's rule decides: the average of the last `window`
+  probabilities must exceed `cutoff`.
+- **`.onnx`**: the Hugo assistant's openWakeWord chain with tract, the same runtime the
+  assistant uses, and its detection rule. The two openWakeWord feature models download once
+  into `training_run/oww/models`.
+
+| option | meaning |
+|---|---|
+| `--tflite FILE` / `--onnx FILE` | the models to test (default: the two in `ahoj_hugo_model/`) |
+| `--no-tflite` / `--no-onnx` | test only one of them |
+| `--cutoff 0.9` / `--window 5` | `.tflite` decision settings (default: the model's `.json`) |
+| `--onnx-threshold 0.5` / `--onnx-min-positive 2` | `.onnx` decision settings (the assistant's defaults) |
+| `--expect silent` | for a folder of recordings that must **not** wake the model |
+| `--min-rate 90` | exit with status 1 below this success rate (default 100), e.g. in a script |
+| `--pad-start 1` / `--pad-end 0.5` | seconds of silence around each clip (the device ignores its first second) |
+| `--jobs N` | files tested at the same time (default: one per CPU core) |
+
+Lines print as files finish, so their order varies; the failed files and the success rates
+come last.
+
+WAVs can be any sample rate, bit depth or channel count. Recordings you trained on (for
+example the ones added with `--extra-wavs`) only show that the model learned them; keep a
+few out of training to see how it does on new ones. To find a cutoff, re-run with a few
+`--cutoff` values: the `avg` column shows how close each miss came.
+
+## 5. Verify and flash with havoice
 
 Flashing needs ESPHome. The Voice PE firmware pins its external components to an ESPHome dev
 commit, so a release is too old; install the dev branch into its own venv, which havoice
@@ -363,7 +409,7 @@ Expect a few rounds:
 
 | symptom | fix |
 |---|---|
-| misses wake-ups | lower the cutoff: `install … --cutoff 0.9` (the default in the manifest is 0.97) |
+| misses wake-ups | lower the cutoff: `install … --cutoff 0.9` (the default in the manifest is 0.97); try values first with `test_wavs --cutoff` |
 | false triggers | raise the cutoff; retrain with more varied positives so the model needs less leeway |
 | false triggers on one similar phrase | add it as `--negatives N --negative-phrase "…"` and retrain with `--negatives` |
 | works for some voices only | add `--multi 2000` (or more) for many more speakers |

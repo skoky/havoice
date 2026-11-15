@@ -1,541 +1,1234 @@
 [
  {
-  "recall": 0.9476744186046512,
-  "false_per_hour": 43.37373703411059,
+  "recall": 0.8288461538461539,
+  "false_per_hour": 6.0521493535968265,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
     true,
     true,
-    0.9995130300521851
+    0.9958327412605286
    ],
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    0.9989928603172302
+    false,
+    0.36660271883010864
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.054892100393772125
+    0.014494946226477623
    ],
    [
     "short_silence.wav",
     false,
     false,
-    0.9990776777267456
+    0.9912739396095276
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    0.9995404481887817
+    0.9887464642524719
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
     true,
-    false,
-    0.9995636343955994
+    true,
+    0.9931882619857788
    ],
    [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9992734789848328
+    0.9794461727142334
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9990817308425903
+    0.972931444644928
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
-    false,
-    0.9993345141410828
+    true,
+    0.990032434463501
    ]
   ],
   "step": 1000,
-  "loss": 0.10332633554935455,
-  "negative_weight": 2.9333333333333336
+  "loss": 0.2655838429927826,
+  "negative_weight": 20.933333333333334
  },
  {
-  "recall": 0.938953488372093,
-  "false_per_hour": 28.24336365011852,
+  "recall": 0.7942307692307692,
+  "false_per_hour": 5.043457794664022,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
     true,
     true,
-    0.9998928308486938
+    0.9988180994987488
    ],
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    0.9986007809638977
+    false,
+    0.31363987922668457
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.06734294444322586
+    0.004243404138833284
    ],
    [
     "short_silence.wav",
     false,
     true,
-    0.9997723698616028
+    0.9937213659286499
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    0.999910831451416
+    0.9934514760971069
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
     true,
-    false,
-    0.9998618364334106
+    true,
+    0.9985270500183105
    ],
    [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9997308850288391
+    0.9935110211372375
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9995341300964355
+    0.9936612844467163
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    0.9997766613960266
+    0.9975190162658691
    ]
   ],
   "step": 2000,
-  "loss": 0.10204688459634781,
-  "negative_weight": 4.866666666666667
+  "loss": 0.30850479006767273,
+  "negative_weight": 40.86666666666667
  },
  {
-  "recall": 0.8982558139534884,
+  "recall": 0.6730769230769231,
+  "false_per_hour": 2.017383117865609,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9990967512130737
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.02126999758183956
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0007370003731921315
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9905912280082703
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9435269832611084
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9992979764938354
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.995173990726471
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9793715476989746
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9992202520370483
+   ]
+  ],
+  "step": 3000,
+  "loss": 0.4454247057437897,
+  "negative_weight": 60.800000000000004
+ },
+ {
+  "recall": 0.7115384615384616,
+  "false_per_hour": 2.017383117865609,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9992782473564148
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.027769530192017555
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0006230942672118545
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9989808201789856
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.997783362865448
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.999138355255127
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9976620674133301
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9938044548034668
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9993168115615845
+   ]
+  ],
+  "step": 4000,
+  "loss": 0.2860909402370453,
+  "negative_weight": 80.73333333333333
+ },
+ {
+  "recall": 0.8057692307692308,
+  "false_per_hour": 2.017383117865609,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9997389912605286
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.07425934076309204
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.00016938653425313532
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9995744824409485
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.999427318572998
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.999657154083252
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9989959597587585
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9985231757164001
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9997664093971252
+   ]
+  ],
+  "step": 5000,
+  "loss": 0.35851478576660156,
+  "negative_weight": 100.66666666666666
+ },
+ {
+  "recall": 0.8403846153846154,
   "false_per_hour": 8.069532471462436,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
     true,
     true,
-    0.999976634979248
+    0.9999023675918579
    ],
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    0.9989016056060791
+    false,
+    0.13148272037506104
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.02753143198788166
+    0.0003075673885177821
    ],
    [
     "short_silence.wav",
     false,
     true,
-    0.9999414682388306
+    0.9997456669807434
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    0.9999678134918213
+    0.9995877146720886
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
     true,
     true,
-    0.9999781847000122
+    0.9998887777328491
    ],
    [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.999920129776001
+    0.9996802806854248
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9997170567512512
+    0.9983695149421692
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    0.999943733215332
+    0.9997938275337219
    ]
   ],
-  "step": 3000,
-  "loss": 0.11355779320001602,
-  "negative_weight": 6.800000000000001
+  "step": 6000,
+  "loss": 0.28770801424980164,
+  "negative_weight": 120.60000000000001
  },
  {
-  "recall": 0.9331395348837209,
-  "false_per_hour": 24.208597414387306,
+  "recall": 0.8653846153846154,
+  "false_per_hour": 7.06084091252963,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999451637268066
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.20284810662269592
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0022530860733240843
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9998801946640015
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.999916672706604
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999430179595947
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9997257590293884
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9994921684265137
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9999339580535889
+   ]
+  ],
+  "step": 7000,
+  "loss": 0.32501596212387085,
+  "negative_weight": 140.53333333333333
+ },
+ {
+  "recall": 0.7365384615384616,
+  "false_per_hour": 2.017383117865609,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999486207962036
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.042703647166490555
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0003422772861085832
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9990853071212769
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9996825456619263
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999611377716064
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9988633394241333
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9982295632362366
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9999668598175049
+   ]
+  ],
+  "step": 8000,
+  "loss": 0.354128360748291,
+  "negative_weight": 160.46666666666667
+ },
+ {
+  "recall": 0.8288461538461539,
+  "false_per_hour": 5.043457794664022,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999836683273315
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.38280001282691956
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.001132885692641139
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9998390674591064
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999392032623291
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.999982476234436
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9993069171905518
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9992892742156982
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.999985933303833
+   ]
+  ],
+  "step": 9000,
+  "loss": 0.6267419457435608,
+  "negative_weight": 180.4
+ },
+ {
+  "recall": 0.7903846153846154,
+  "false_per_hour": 2.017383117865609,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999849796295166
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.0242651104927063
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    5.44426693522837e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9998786449432373
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999392032623291
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999876022338867
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9996951818466187
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9991718530654907
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.999982476234436
+   ]
+  ],
+  "step": 10000,
+  "loss": 0.33086585998535156,
+  "negative_weight": 200.33333333333331
+ },
+ {
+  "recall": 0.8076923076923077,
+  "false_per_hour": 2.017383117865609,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999905824661255
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.1470886617898941
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0001342871692031622
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999449253082275
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999845027923584
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
     true,
     true,
     0.99998939037323
    ],
    [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9996674060821533
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.02745765447616577
-   ],
-   [
-    "short_silence.wav",
-    false,
-    false,
-    0.9999825954437256
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    0.9999715089797974
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    0.9999912977218628
-   ],
-   [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9999819993972778
+    0.9999734163284302
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9999171495437622
+    0.9996703863143921
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    0.9999810457229614
+    0.9999850988388062
    ]
   ],
-  "step": 4000,
-  "loss": 0.09938465058803558,
-  "negative_weight": 8.733333333333334
+  "step": 11000,
+  "loss": 0.3424345552921295,
+  "negative_weight": 220.26666666666665
  },
  {
-  "recall": 0.9186046511627907,
-  "false_per_hour": 22.191214296521697,
+  "recall": 0.8365384615384616,
+  "false_per_hour": 5.043457794664022,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999887943267822
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.4183664917945862
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0013814796693623066
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999681711196899
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999762773513794
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999949932098389
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9998424053192139
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9995515942573547
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.999972939491272
+   ]
+  ],
+  "step": 12000,
+  "loss": 0.3074164092540741,
+  "negative_weight": 240.20000000000002
+ },
+ {
+  "recall": 0.8692307692307693,
+  "false_per_hour": 7.06084091252963,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999970197677612
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.06494846940040588
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    0.0006642380612902343
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999637603759766
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999750852584839
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999953508377075
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9996738433837891
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9998185038566589
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9999926090240479
+   ]
+  ],
+  "step": 13000,
+  "loss": 0.3428167700767517,
+  "negative_weight": 260.1333333333333
+ },
+ {
+  "recall": 0.7788461538461539,
+  "false_per_hour": 1.0086915589328045,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999934434890747
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.0380232110619545
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    5.9947291447315365e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999486207962036
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999828338623047
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
     true,
     true,
     0.9999961853027344
    ],
    [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.999446451663971
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.01750694029033184
-   ],
-   [
-    "short_silence.wav",
-    false,
-    false,
-    0.999992847442627
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    0.999985933303833
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    0.999996542930603
-   ],
-   [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9999837875366211
+    0.999588668346405
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9998974800109863
+    0.9969514608383179
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    0.9999878406524658
+    0.9999744892120361
    ]
   ],
-  "step": 5000,
-  "loss": 0.09324425458908081,
-  "negative_weight": 10.666666666666666
+  "step": 14000,
+  "loss": 0.3183068633079529,
+  "negative_weight": 280.06666666666666
  },
  {
-  "recall": 0.9273255813953488,
-  "false_per_hour": 21.182522737588894,
+  "recall": 0.7673076923076924,
+  "false_per_hour": 1.0086915589328045,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
     true,
     true,
-    0.9999991655349731
+    0.9999818801879883
    ],
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    0.9998996257781982
+    false,
+    0.02718312479555607
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.011716584675014019
+    0.00011946727317990735
    ],
    [
     "short_silence.wav",
     false,
+    true,
+    0.9999145269393921
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9997535347938538
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999778270721436
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9993898868560791
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9895558953285217
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9999572038650513
+   ]
+  ],
+  "step": 15000,
+  "loss": 0.26176124811172485,
+  "negative_weight": 300.0
+ },
+ {
+  "recall": 0.7961538461538461,
+  "false_per_hour": 3.0260746767984132,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999995231628418
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.009123063646256924
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    6.305138958850875e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999849796295166
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999911785125732
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999995231628418
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9999117851257324
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9998206496238708
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
     true,
     0.9999985694885254
+   ]
+  ],
+  "step": 16000,
+  "loss": 0.33234643936157227,
+  "negative_weight": 300.0
+ },
+ {
+  "recall": 0.875,
+  "false_per_hour": 6.0521493535968265,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999995231628418
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.2557740807533264
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    6.355690857162699e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999935626983643
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    0.999997615814209
+    0.9999980926513672
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    0.999998927116394
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    0.9999916553497314
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    0.9999597072601318
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    0.9999958276748657
-   ]
-  ],
-  "step": 6000,
-  "loss": 0.08040861040353775,
-  "negative_weight": 12.600000000000001
- },
- {
-  "recall": 0.9273255813953488,
-  "false_per_hour": 22.191214296521697,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
     true,
     true,
     0.9999994039535522
    ],
    [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.99982750415802
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.0037540991324931383
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    0.9999990463256836
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    0.9999992847442627
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    0.999998927116394
-   ],
-   [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9999933242797852
+    0.9999585151672363
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9999871253967285
+    0.9998236298561096
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    0.9999949932098389
+    0.9999984502792358
    ]
   ],
-  "step": 7000,
-  "loss": 0.08413964509963989,
-  "negative_weight": 14.533333333333333
+  "step": 17000,
+  "loss": 0.26772332191467285,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 29.252055209051328,
+  "recall": 0.8673076923076923,
+  "false_per_hour": 6.0521493535968265,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
-    true,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9996930360794067
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.02637912891805172
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    0.9999997615814209
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
     0.9999996423721313
    ],
    [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.06817400455474854
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    1.9726017853827216e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.999996542930603
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
+    true,
+    true,
+    0.9999982118606567
+   ],
+   [
     "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999997615814209
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_short2.wav",
+    true,
+    true,
+    0.9999223947525024
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9997826218605042
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9999985694885254
+   ]
+  ],
+  "step": 18000,
+  "loss": 0.1539308875799179,
+  "negative_weight": 300.0
+ },
+ {
+  "recall": 0.8826923076923077,
+  "false_per_hour": 6.0521493535968265,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999998807907104
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.3906666338443756
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    1.9672927010105923e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
+    true,
+    0.9999971389770508
+   ],
+   [
+    "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
     0.9999994039535522
    ],
    [
+    "p_rhino_surface2_100_241227-164451_short.wav",
+    true,
+    true,
+    0.9999998807907104
+   ],
+   [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9999988079071045
+    0.9999774694442749
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9999980926513672
+    0.9998975992202759
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    0.9999995231628418
+    0.9999996423721313
    ]
   ],
-  "step": 8000,
-  "loss": 0.06835982948541641,
-  "negative_weight": 16.46666666666667
+  "step": 19000,
+  "loss": 0.28881603479385376,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.9331395348837209,
-  "false_per_hour": 23.1999058554545,
+  "recall": 0.8480769230769231,
+  "false_per_hour": 5.043457794664022,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    0.9999277591705322
+    false,
+    0.10062053799629211
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.011415335349738598
+    4.245334639563225e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    0.9999997615814209
+    0.9999979734420776
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    0.9999998807907104
+    0.9999990463256836
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -546,815 +1239,122 @@
    [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
+    true,
+    0.9999876022338867
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451.wav",
+    true,
+    true,
+    0.9997009038925171
+   ],
+   [
+    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
+    true,
+    true,
+    0.9999997615814209
+   ]
+  ],
+  "step": 20000,
+  "loss": 0.16497446596622467,
+  "negative_weight": 300.0
+ },
+ {
+  "recall": 0.8480769230769231,
+  "false_per_hour": 6.0521493535968265,
+  "assistant_tests": [
+   [
+    "testing_2x_hugo.wav",
+    true,
+    true,
+    0.9999998807907104
+   ],
+   [
+    "ahoj_ufo.wav",
+    false,
+    false,
+    0.0522795245051384
+   ],
+   [
+    "jake_je_pocasi.wav",
+    false,
+    false,
+    3.781143095693551e-05
+   ],
+   [
+    "short_silence.wav",
+    false,
     true,
     0.9999991655349731
    ],
    [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    0.9999980926513672
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    0.9999995231628418
-   ]
-  ],
-  "step": 9000,
-  "loss": 0.11337081342935562,
-  "negative_weight": 18.4
- },
- {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 39.33897079837937,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999614953994751
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.013870468363165855
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    0.9999998807907104
-   ],
-   [
     "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
     0.9999997615814209
    ],
    [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    0.9999998807907104
-   ]
-  ],
-  "step": 10000,
-  "loss": 0.07006022334098816,
-  "negative_weight": 20.333333333333332
- },
- {
-  "recall": 0.9476744186046512,
-  "false_per_hour": 41.35635391624498,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999836683273315
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.009612824767827988
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
     "p_rhino_surface2_100_241227-164451_short.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    0.9999998807907104
+    0.9999716281890869
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    0.9999998807907104
+    0.9998487234115601
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
-    true,
-    0.9999998807907104
-   ]
-  ],
-  "step": 11000,
-  "loss": 0.06740500032901764,
-  "negative_weight": 22.266666666666666
- },
- {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 30.26074676798413,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999958276748657
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.012725631706416607
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 12000,
-  "loss": 0.08267755061388016,
-  "negative_weight": 24.200000000000003
- },
- {
-  "recall": 0.9273255813953488,
-  "false_per_hour": 19.165139619723284,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999977350234985
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.007028757128864527
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 13000,
-  "loss": 0.11665385961532593,
-  "negative_weight": 26.133333333333333
- },
- {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 30.26074676798413,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999980926513672
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.00551088061183691
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 14000,
-  "loss": 0.07370871305465698,
-  "negative_weight": 28.066666666666666
- },
- {
-  "recall": 0.9273255813953488,
-  "false_per_hour": 30.26074676798413,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999978542327881
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.011534920893609524
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 15000,
-  "loss": 0.07460075616836548,
-  "negative_weight": 30.0
- },
- {
-  "recall": 0.9331395348837209,
-  "false_per_hour": 39.33897079837937,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
     true,
     0.9999997615814209
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.0087386853992939
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 16000,
-  "loss": 0.08006160706281662,
-  "negative_weight": 30.0
- },
- {
-  "recall": 0.936046511627907,
-  "false_per_hour": 36.312896121580955,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.008065099827945232
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 17000,
-  "loss": 0.06460000574588776,
-  "negative_weight": 30.0
- },
- {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 34.29551300371535,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    0.9999998807907104
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.009679814800620079
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 18000,
-  "loss": 0.03903525695204735,
-  "negative_weight": 30.0
- },
- {
-  "recall": 0.9244186046511628,
-  "false_per_hour": 33.28682144478255,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.008375898003578186
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 19000,
-  "loss": 0.045526646077632904,
-  "negative_weight": 30.0
- },
- {
-  "recall": 0.9186046511627907,
-  "false_per_hour": 32.278129885849744,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.015534032136201859
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
-   ]
-  ],
-  "step": 20000,
-  "loss": 0.031586870551109314,
-  "negative_weight": 30.0
- },
- {
-  "recall": 0.9331395348837209,
-  "false_per_hour": 29.252055209051328,
-  "assistant_tests": [
-   [
-    "testing_2x_hugo.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "ahoj_ufo.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "jake_je_pocasi.wav",
-    false,
-    false,
-    0.014151336625218391
-   ],
-   [
-    "short_silence.wav",
-    false,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface1_100_250123-084742_1293.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_short2.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451.wav",
-    true,
-    true,
-    1.0
-   ],
-   [
-    "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
-    true,
-    true,
-    1.0
    ]
   ],
   "step": 21000,
-  "loss": 0.03580417484045029,
-  "negative_weight": 30.0
+  "loss": 0.23295648396015167,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 35.30420456264815,
+  "recall": 0.8807692307692307,
+  "false_per_hour": 8.069532471462436,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.19802400469779968
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.013015673495829105
+    9.364895231556147e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999984502792358
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -1366,28 +1366,28 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999847412109375
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999966621398926
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ]
   ],
   "step": 22000,
-  "loss": 0.02975158765912056,
-  "negative_weight": 30.0
+  "loss": 0.19013328850269318,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.9302325581395349,
-  "false_per_hour": 32.278129885849744,
+  "recall": 0.8961538461538462,
+  "false_per_hour": 10.086915589328044,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1398,26 +1398,26 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.34653931856155396
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.02425326034426689
+    8.503017306793481e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999994039535522
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -1429,13 +1429,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999967813491821
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999986886978149
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1445,12 +1445,12 @@
    ]
   ],
   "step": 23000,
-  "loss": 0.021733634173870087,
-  "negative_weight": 30.0
+  "loss": 0.2196427285671234,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.9418604651162791,
-  "false_per_hour": 43.37373703411059,
+  "recall": 0.8653846153846154,
+  "false_per_hour": 6.0521493535968265,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1461,26 +1461,26 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.12292288988828659
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.024890393018722534
+    5.9491474530659616e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999991655349731
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -1492,13 +1492,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999960660934448
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999974966049194
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1508,12 +1508,12 @@
    ]
   ],
   "step": 24000,
-  "loss": 0.02392927184700966,
-  "negative_weight": 30.0
+  "loss": 0.1898687481880188,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.936046511627907,
-  "false_per_hour": 31.269438326916937,
+  "recall": 0.8865384615384615,
+  "false_per_hour": 6.0521493535968265,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1524,26 +1524,26 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.2037680596113205
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.021142981946468353
+    5.207527647144161e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999994039535522
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -1555,28 +1555,28 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999932050704956
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999923706054688
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ]
   ],
   "step": 25000,
-  "loss": 0.017177969217300415,
-  "negative_weight": 30.0
+  "loss": 0.22608603537082672,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.936046511627907,
-  "false_per_hour": 42.36504547517779,
+  "recall": 0.8884615384615384,
+  "false_per_hour": 8.069532471462436,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1587,26 +1587,26 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.19767193496227264
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.019956188276410103
+    7.472313882317394e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999995231628418
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -1618,13 +1618,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999924898147583
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999971389770508
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1634,12 +1634,12 @@
    ]
   ],
   "step": 26000,
-  "loss": 0.026128793135285378,
-  "negative_weight": 30.0
+  "loss": 0.17236429452896118,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.9331395348837209,
-  "false_per_hour": 41.35635391624498,
+  "recall": 0.8923076923076924,
+  "false_per_hour": 10.086915589328044,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1650,20 +1650,20 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.19878877699375153
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.019603904336690903
+    4.398910095915198e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999995231628418
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
@@ -1681,13 +1681,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999945163726807
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999978542327881
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1697,12 +1697,12 @@
    ]
   ],
   "step": 27000,
-  "loss": 0.024619420990347862,
-  "negative_weight": 30.0
+  "loss": 0.1984749734401703,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.936046511627907,
-  "false_per_hour": 40.347662357312174,
+  "recall": 0.8903846153846153,
+  "false_per_hour": 10.086915589328044,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1713,26 +1713,26 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.16923733055591583
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.024563876911997795
+    4.5885390136390924e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999995231628418
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
     true,
     true,
-    1.0
+    0.9999998807907104
    ],
    [
     "p_rhino_surface2_100_241227-164451_short.wav",
@@ -1744,13 +1744,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999922513961792
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999973773956299
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1760,12 +1760,12 @@
    ]
   ],
   "step": 28000,
-  "loss": 0.033158279955387115,
-  "negative_weight": 30.0
+  "loss": 0.2362748682498932,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.936046511627907,
-  "false_per_hour": 43.37373703411059,
+  "recall": 0.8903846153846153,
+  "false_per_hour": 9.078224030395239,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1776,20 +1776,20 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.27971044182777405
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.023427419364452362
+    4.355905548436567e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999996423721313
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
@@ -1807,13 +1807,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.9999936819076538
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999973773956299
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1823,12 +1823,12 @@
    ]
   ],
   "step": 29000,
-  "loss": 0.03528532758355141,
-  "negative_weight": 30.0
+  "loss": 0.21715208888053894,
+  "negative_weight": 300.0
  },
  {
-  "recall": 0.938953488372093,
-  "false_per_hour": 41.35635391624498,
+  "recall": 0.8942307692307693,
+  "false_per_hour": 10.086915589328044,
   "assistant_tests": [
    [
     "testing_2x_hugo.wav",
@@ -1839,20 +1839,20 @@
    [
     "ahoj_ufo.wav",
     false,
-    true,
-    1.0
+    false,
+    0.23141764104366302
    ],
    [
     "jake_je_pocasi.wav",
     false,
     false,
-    0.024102507159113884
+    4.861485285800882e-05
    ],
    [
     "short_silence.wav",
     false,
     true,
-    1.0
+    0.9999996423721313
    ],
    [
     "p_rhino_surface1_100_250123-084742_1293.wav",
@@ -1870,13 +1870,13 @@
     "p_rhino_surface2_100_241227-164451_short2.wav",
     true,
     true,
-    1.0
+    0.999994158744812
    ],
    [
     "p_rhino_surface2_100_241227-164451.wav",
     true,
     true,
-    1.0
+    0.9999978542327881
    ],
    [
     "p_rhino_surface2_100_241227-164451_hugo_2x.wav",
@@ -1886,7 +1886,7 @@
    ]
   ],
   "step": 30000,
-  "loss": 0.028324002400040627,
-  "negative_weight": 30.0
+  "loss": 0.13788890838623047,
+  "negative_weight": 300.0
  }
 ]

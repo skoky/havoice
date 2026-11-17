@@ -7,3 +7,10 @@ firmware/secrets.yaml
 .venv-esphome/
 firmware/models/
 firmware/voice-pe-wake-words.yaml
+.venv
+samples
+training_run
+.DS_Store
+__pycache__/
+# trained models (training/train_wake_word.py writes <name>_model/)
+*_model/

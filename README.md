@@ -102,6 +102,7 @@ keeps working while havoice is connected.
 | `cargo run --example wake_word -- verify <src>` | check a model the way the device does (catalogue name, URL, or local file) |
 | `cargo run --example wake_word -- install <src> [--flash]` | build verified models into the firmware; `--flash` uploads it over Wi-Fi |
 | `cargo run --example wake_word -- listen` | print every wake word detection with its probabilities |
+| `cargo run --release --example test_wavs -- <dir> --tflite <model>` | score a folder of WAV recordings with a `.tflite` model, run the way the device runs it |
 
 ## Command-line tool
 
@@ -157,15 +158,69 @@ has, input int8 `[1, stride, 40]`, output uint8 `[1, 1]`, sensible manifest valu
 * Sources: an [ESPHome catalogue](https://github.com/esphome/micro-wake-word-models) name (`alexa`,
   `hey_home_assistant`, ...), an http(s) URL of a manifest `.json` or a `.tflite`, or a local file. A bare
   `.tflite` needs `--wake-word "..."` (optionally `--language`, `--cutoff`, `--window`, `--arena`).
-* `--flash` needs the ESPHome CLI (`pip install esphome`, or set `HAVOICE_ESPHOME`). The first build downloads
-  about 1 GB of toolchain and takes 10-20 minutes; later builds take a minute. The upload goes over Wi-Fi.
+* `--flash` needs the ESPHome CLI: `esphome` on `PATH`, `HAVOICE_ESPHOME`, or `.venv-esphome/bin/esphome` in
+  this repository (see below). The first build downloads about 1 GB of toolchain and takes 10-20 minutes; later
+  builds take a minute. The upload goes over Wi-Fi.
 * Added models switch on whenever an API client connects; Home Assistant can still choose wake words as usual.
 * If the device can't reach its saved Wi-Fi network, the custom firmware opens a fallback hotspot; its password is
   in `firmware/secrets.yaml`.
 * Back to stock firmware: `wake_word remove <id> --flash`, or the
   [Voice PE web flasher](https://esphome.github.io/home-assistant-voice-pe/).
 
-Only microWakeWord models run on the device. openWakeWord / ONNX models have to be retrained with microWakeWord.
+Only microWakeWord models run on the device. openWakeWord / ONNX models have to be retrained with microWakeWord
+(see [Training your own wake word](#training-your-own-wake-word)).
+
+### Uploading a model to the device
+
+A model is a `.tflite` plus its manifest `.json` (the training below writes both into `<name>_model/`). The Voice PE
+firmware pins its components to an ESPHome dev commit, so install ESPHome's dev branch once, into the venv havoice
+looks for:
+
+```bash
+python3 -m venv .venv-esphome
+.venv-esphome/bin/pip install "https://github.com/esphome/esphome/archive/dev.zip"
+```
+
+Then check the model, build it into the firmware and upload it over Wi-Fi (`HAVOICE_HOST` / `HAVOICE_KEY` as in
+[Connecting](#connecting)):
+
+```bash
+cargo run --example wake_word -- verify hey_computer_model/hey_computer.json
+cargo run --example wake_word -- install hey_computer_model/hey_computer.json --flash
+cargo run --example wake_word -- listen
+```
+
+`verify` changes nothing. `install` stores the model in `firmware/models/` and writes the firmware YAML; `--flash`
+builds and uploads it (the device restarts with the new firmware). Several models can be installed; every build
+includes all stored ones. `listen` prints each detection with its probabilities, so you can say the phrase and
+see how close it gets.
+
+* Misses wake-ups or wakes on its own: re-install with another `--cutoff` (lower = wakes more easily) and flash
+  again; no retraining needed.
+* Remove one: `wake_word remove hey_computer --flash`. See what is stored and on the device: `wake_word list`.
+
+## Training your own wake word
+
+[`training/`](training/README.md) trains a microWakeWord model for any phrase, in any language Piper text-to-speech
+can speak, with no recordings needed (your own recordings make it better). In short:
+
+```bash
+# once: Python 3.12 venv with Piper, microWakeWord and TensorFlow (see training/README.md)
+python3 training/generate_samples.py --phrase "Hey Computer" --count 1000 --multi 2000
+python3 training/train_wake_word.py --wake-word "Hey Computer" --language en
+cargo run --release --example test_wavs -- my_recordings --tflite hey_computer_model/hey_computer.tflite
+```
+
+1. **Samples:** `generate_samples.py` synthesizes thousands of spoken variants of the phrase with many voices
+   (`--language` picks Czech, German or English voice presets, or name your own), plus optional phrases that
+   must *not* wake the device.
+2. **Training:** `train_wake_word.py` downloads background noise and negative speech datasets (~30 GB), augments
+   the samples, trains and quantizes the model, and writes `hey_computer_model/hey_computer.tflite` + `.json`.
+   It takes hours: fast on an NVIDIA GPU, overnight on a CPU, or use the
+   [Colab notebook](training/train_wake_word.ipynb) for a free GPU.
+3. **Test** it on real recordings with `test_wavs`, then [upload it](#uploading-a-model-to-the-device).
+
+[training/README.md](training/README.md) covers requirements per OS, every option, re-running and tuning.
 
 ## Linux and macOS
 
@@ -208,12 +263,14 @@ src/api.rs         connection, message fan-out, entities, error hints
 src/audio.rs       PCM, FLAC encoding, WAV reading
 src/tts.rs         say / espeak-ng, voices
 src/wake_word.rs   model checks (a small TFLite reader), firmware YAML, detections
+src/micro_*.rs     the device's audio frontend + int8 interpreter, to test models on WAVs
 src/improv.rs      Wi-Fi setup over USB (Improv Serial)
 src/discover.rs    mDNS
 src/serial.rs      USB log
 src/serve.rs       one-file HTTP server for local audio
 src/main.rs        the havoice CLI
 examples/          the examples above
+training/          wake word training (Python)
 ```
 
 Not affiliated with Nabu Casa, Home Assistant or ESPHome.

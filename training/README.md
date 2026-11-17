@@ -4,13 +4,16 @@ The Voice PE only runs [microWakeWord](https://github.com/kahrendt/microWakeWord
 (int8 streaming TFLite, 40-bin spectrogram input). An openWakeWord model can't be converted
 into one; it has to be trained from audio. This directory trains one for any phrase, in any
 language Piper text-to-speech can speak, and covers every step, from no data to a flashed
-device. The examples use "Hey Computer"; every file is named after the phrase
+device. From the same samples it can also train an
+[openWakeWord](https://github.com/dscripka/openWakeWord) ONNX classifier for a streaming
+openWakeWord runtime. The examples use "Hey Computer"; every file is named after the phrase
 (`hey_computer`).
 
 ```
 generate_samples.py ──► samples/<name>.zip ──► train_wake_word.py ──► <name>_model/
    (Piper, edge-tts,       1000+ 16 kHz WAVs     (or the Colab           <name>.tflite ─► Voice PE
-    say, your voice)                             notebook)               <name>.json
+    say, your voice)                             notebook:               <name>.json
+                                                 .tflite only)           <name>.onnx ──► openWakeWord runtime
                                                                                  │
                                          cargo run --example wake_word -- install --flash
 ```
@@ -18,7 +21,8 @@ generate_samples.py ──► samples/<name>.zip ──► train_wake_word.py �
 | file | purpose |
 |---|---|
 | `generate_samples.py` | samples of your phrase(s), optional negatives (Piper voices, edge-tts, macOS `say`, real recordings) |
-| `train_wake_word.py` | local training: downloads, augmentation, features, training, quantization, manifest |
+| `train_wake_word.py` | local training of both models: downloads, augmentation, features, training, quantization, manifest |
+| `train_oww.py` | the ONNX step on its own (run by `train_wake_word.py`) |
 | `mww_train.py` | runs microWakeWord's training with small-GPU fixes (run by `train_wake_word.py`) |
 | `train_wake_word.ipynb` | the same pipeline as a Google Colab notebook (free GPU) |
 
@@ -252,8 +256,11 @@ python3 training/train_wake_word.py --wake-word "Hey Computer" --language en \
     --negatives samples/hey_computer_negatives.zip
 ```
 
-This builds `hey_computer_model/hey_computer.tflite` and its manifest for the Voice PE
-(hours). The samples default to `samples/hey_computer.zip` (`--samples`), the file names to
+This builds both models: `hey_computer_model/hey_computer.onnx` first (about 40 minutes the
+first time; a few minutes when the samples are unchanged), then
+`hey_computer_model/hey_computer.tflite` and its manifest for the Voice PE (hours).
+`--onnx-only` or `--no-onnx` builds just one. Details on the ONNX model are in
+[ONNX model](#onnx-model) below. The samples default to `samples/hey_computer.zip` (`--samples`), the file names to
 the wake word (`--name`).
 
 | option | meaning |
@@ -267,6 +274,8 @@ the wake word (`--name`).
 | `--cutoff 0.97` | manifest `probability_cutoff` |
 | `--workdir DIR` | scratch directory (default `training_run/`) |
 | `--skip-download-data` | don't check the downloads |
+| `--no-onnx` / `--onnx-only` | build only the `.tflite` / only the `.onnx` |
+| `--test-positive DIR` / `--test-negative DIR` | ONNX step: your recordings that must / must not wake it, checked at the end |
 
 Long runs: use `tmux`/`screen` on Ubuntu, and on macOS prefix the command with
 `caffeinate -i` so the Mac doesn't sleep.
@@ -292,6 +301,39 @@ Follow the training curves in a second terminal:
 ```bash
 .venv/bin/tensorboard --logdir training_run/hey_computer/trained_models/wakeword/logs
 ```
+
+### ONNX model
+
+An openWakeWord runtime chains three models: `melspectrogram.onnx` → `embedding_model.onnx`
+→ a small classifier, `hey_computer.onnx`, which takes `[1, 16, 96]` and returns `[1, 1]`.
+`train_oww.py` trains only that classifier, with openWakeWord's DNN architecture (two
+32-unit layers with layer norm, opset 13, basic operators only, so tract runs it).
+
+- **Features match a streaming runtime, not the openWakeWord package.** The model is for a
+  runtime that runs the spectrogram model on each 80 ms chunk on its own (as
+  `examples/test_wavs.rs` does with tract), so it gets 5 frames per chunk instead of
+  openWakeWord's 8. `train_oww.py` computes features exactly that way. For the same reason
+  openWakeWord's precomputed negative sets can't be used here.
+- **Feature models.** The two openWakeWord v0.5.1 feature models download into
+  `training_run/oww/models`; `--feature-models DIR` uses your runtime's copies instead
+  (checked by hash).
+- **Negatives.** [FLEURS](https://huggingface.co/datasets/google/fleurs) read speech in the
+  `--language` (CC-BY-4.0, 1-2 GB download into `training_run/oww/`; `--fleurs es_419` for
+  a FLEURS config the language code doesn't map to), FLEURS speech over FMA music, FMA music,
+  and synthetic noise. Also the lead-in before every positive phrase (the same background
+  without the phrase, including the zero-filled start-up windows), the first half of every
+  phrase (the first word alone must not fire), and `--negatives`.
+- **Validation** uses the runtime's decision rule (threshold 0.5, at least 3 hits in the
+  last 12 chunks, 2 s refractory). It measures recall on held-out samples and false wake-ups
+  per hour on FLEURS dev (about 1 h). The best checkpoint is the highest recall at or below
+  `--target-false-per-hour` (default 0.5); if none reaches it, the fewest false wake-ups.
+  With `--test-positive` / `--test-negative` it also runs your recordings through the new
+  model at the end and prints ok or FAIL per file.
+- **Caches.** Negative features (about 17 minutes to compute) and positive features are
+  cached in `training_run/oww/`. Training alone takes about 3 minutes.
+
+The training history (recall and false wake-ups per evaluation) is written next to the
+model as `hey_computer.history.json`.
 
 ### Re-running and resuming
 
@@ -322,35 +364,43 @@ Follow the training curves in a second terminal:
 
 ## 4. Test on your recordings
 
-Before flashing, run the model over a folder of WAVs and get a success rate:
+Before flashing, run the models over a folder of WAVs and get a success rate:
 
 ```bash
-cargo run --release --example test_wavs -- my_recordings --tflite hey_computer_model/hey_computer.tflite
+cargo run --release --example test_wavs -- my_recordings \
+    --tflite hey_computer_model/hey_computer.tflite --onnx hey_computer_model/hey_computer.onnx
 ```
 
 ```
-take01.wav                     tflite DETECTED avg 1.00 peak 1.00 @2.08s
-take02.wav                     tflite MISSED   avg 0.00 peak 0.05
+take01.wav                     tflite DETECTED avg 1.00 peak 1.00 @2.08s   onnx DETECTED avg 1.00 peak 1.00 @1.96s
+take02.wav                     tflite MISSED   avg 0.00 peak 0.05          onnx DETECTED avg 1.00 peak 1.00 @1.56s
 …
 tflite detected 15/35 = 42.9%   (cutoff 0.97, window 5)
+onnx   detected 35/35 = 100.0%   (threshold 0.50, min positive 2)
 ```
 
-It runs the model the way the device does, in Rust, with no Python involved: the Voice PE's
-audio frontend and int8 kernels, ported from the firmware's C code and checked to give
-identical numbers (the features match the device's frontend on 17,000+ slices; the
-probabilities match TensorFlow Lite's reference kernels on 1,900 calls). Then the firmware's
-rule decides: the average of the last `window` probabilities must exceed `cutoff`.
+It runs each model the way it runs for real, in Rust, with no Python involved:
+
+- **`.tflite`**: the Voice PE's audio frontend and int8 kernels, ported from the firmware's
+  C code and checked to give identical numbers (the features match the device's frontend
+  on 17,000+ slices; the probabilities match TensorFlow Lite's reference kernels on
+  1,900 calls). Then the firmware's rule decides: the average of the last `window`
+  probabilities must exceed `cutoff`.
+- **`.onnx`**: the streaming openWakeWord chain with tract and its detection rule. The two
+  openWakeWord feature models download once into `training_run/oww/models`
+  (`--feature-models`).
 
 | option | meaning |
 |---|---|
-| `--tflite FILE` | the model to test (required; the manifest is read from the `.json` next to it) |
-| `--cutoff 0.9` / `--window 5` | decision settings (default: the model's `.json`) |
+| `--tflite FILE` / `--onnx FILE` | the models to test, one or both (the `.tflite` manifest is read from the `.json` next to it) |
+| `--cutoff 0.9` / `--window 5` | `.tflite` decision settings (default: the model's `.json`) |
+| `--onnx-threshold 0.5` / `--onnx-min-positive 2` | `.onnx` decision settings |
 | `--expect silent` | for a folder of recordings that must **not** wake the model |
 | `--min-rate 90` | exit with status 1 below this success rate (default 100), e.g. in a script |
 | `--pad-start 1` / `--pad-end 0.5` | seconds of silence around each clip (the device ignores its first second) |
 | `--jobs N` | files tested at the same time (default: one per CPU core) |
 
-Lines print as files finish, so their order varies; the failed files and the success rate
+Lines print as files finish, so their order varies; the failed files and the success rates
 come last.
 
 WAVs can be any sample rate, bit depth or channel count. Recordings you trained on (for

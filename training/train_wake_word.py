@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Train a microWakeWord model for any wake word locally.
+"""Train wake word models for any phrase locally: both files by default.
 
-Local equivalent of training/train_wake_word.ipynb. Point it at the samples
-produced by training/generate_samples.py (a directory or the zip) and it does
-the rest: augmentation data, negative datasets, spectrogram features,
-training, quantization, manifest. The result is <name>.tflite + <name>.json
-in <name>_model/, where <name> comes from the wake word ("Hey Computer" ->
-hey_computer).
+  <name>.tflite + .json  microWakeWord, for the Voice PE device (havoice)
+  <name>.onnx            openWakeWord classifier, trained by training/train_oww.py
+
+Local equivalent of training/train_wake_word.ipynb (which builds only the
+.tflite). Point it at the samples produced by training/generate_samples.py (a
+directory or the zip) and it does the rest: augmentation data, negative
+datasets, spectrogram features, training, quantization, manifest. The models
+go to <name>_model/, where <name> comes from the wake word ("Hey Computer" ->
+hey_computer). The ONNX model trains first (minutes); --no-onnx or
+--onnx-only build just one.
 
     python3 -m pip install 'datasets<4'
     git clone https://github.com/kahrendt/microWakeWord
@@ -47,10 +51,14 @@ def need(module: str, hint: str) -> None:
         sys.exit(f"missing {module}: {hint}")
 
 
-def check_environment() -> None:
-    need("microwakeword",
-         "git clone https://github.com/kahrendt/microWakeWord "
-         "&& python3 -m pip install -e ./microWakeWord")
+def check_environment(tflite: bool = True, onnx: bool = False) -> None:
+    if tflite:
+        need("microwakeword",
+             "git clone https://github.com/kahrendt/microWakeWord "
+             "&& python3 -m pip install -e ./microWakeWord")
+    if onnx:
+        need("onnx", "python3 -m pip install onnx")
+        need("onnxruntime", "python3 -m pip install onnxruntime")
     need("datasets", "python3 -m pip install 'datasets<4'")
     import datasets
     if int(datasets.__version__.split(".")[0]) >= 4:
@@ -318,6 +326,21 @@ def train(word: Path) -> None:
         check=True)
 
 
+def train_onnx(samples: Path, negatives: Path | None, out: Path, language: str,
+               test_positive: Path | None, test_negative: Path | None) -> None:
+    """openWakeWord classifier (train_oww.py), in its own process so its
+    TensorFlow session frees the GPU before microWakeWord."""
+    command = [sys.executable, str(SCRIPT_DIR / "train_oww.py"), "--samples", str(samples),
+               "--out", str(out), "--language", language, "--workdir", "."]
+    if negatives:
+        command += ["--negatives", str(negatives)]
+    if test_positive:
+        command += ["--test-positive", str(test_positive)]
+    if test_negative:
+        command += ["--test-negative", str(test_negative)]
+    subprocess.run(command, check=True)
+
+
 def slug(phrase: str) -> str:
     """"Hey, Computer!" -> hey_computer (same as generate_samples.py)."""
     return re.sub(r"\W+", "_", phrase.lower()).strip("_") or "wake_word"
@@ -392,6 +415,15 @@ def main() -> None:
                              "(--negatives-out), phrases the model must not wake on")
     parser.add_argument("--skip-download-data", action="store_true",
                         help="reuse previously downloaded augmentation/negative data")
+    which = parser.add_mutually_exclusive_group()
+    which.add_argument("--no-onnx", action="store_true",
+                       help="build only the microWakeWord .tflite")
+    which.add_argument("--onnx-only", action="store_true",
+                       help="build only the openWakeWord .onnx")
+    parser.add_argument("--test-positive", type=Path, default=None,
+                        help="ONNX step: folder of real recordings that must wake the model")
+    parser.add_argument("--test-negative", type=Path, default=None,
+                        help="ONNX step: folder of real recordings that must not")
     args = parser.parse_args()
 
     name = args.name or slug(args.wake_word)
@@ -405,9 +437,12 @@ def main() -> None:
     print(f"training \"{args.wake_word}\" ({args.language}) from {args.samples} "
           f"into {args.out}/{name}.tflite")
 
-    check_environment()
+    tflite, onnx = not args.onnx_only, not args.no_onnx
+    check_environment(tflite, onnx)
     samples = args.samples.resolve()
     negatives = args.negatives.resolve() if args.negatives else None
+    test_positive = args.test_positive.expanduser().resolve() if args.test_positive else None
+    test_negative = args.test_negative.expanduser().resolve() if args.test_negative else None
     out_dir = args.out.resolve()
     args.workdir.mkdir(parents=True, exist_ok=True)
     os.chdir(args.workdir)
@@ -415,12 +450,18 @@ def main() -> None:
     # checkpoints live in training_run/<name>/
     word = Path(name)
     word.mkdir(exist_ok=True)
-    unpack_samples(samples, word / "generated_samples")
-    if negatives:
-        unpack_samples(negatives, word / "generated_negatives", "negative")
+    if tflite:
+        unpack_samples(samples, word / "generated_samples")
+        if negatives:
+            unpack_samples(negatives, word / "generated_negatives", "negative")
 
-    if not args.skip_download_data:
-        download_data()
+    if tflite and not args.skip_download_data:
+        download_data()  # train_oww.py fetches what it needs itself
+    if onnx:
+        train_onnx(samples, negatives, out_dir / f"{name}.onnx", args.language,
+                   test_positive, test_negative)
+    if not tflite:
+        return
     build_features(word / "generated_samples", word / "generated_augmented_features")
     if negatives:
         build_features(word / "generated_negatives", word / "generated_negative_features")

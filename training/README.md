@@ -361,11 +361,12 @@ few out of training to see how it does on new ones. To find a cutoff, re-run wit
 ## 5. Verify and flash with havoice
 
 Flashing needs ESPHome. The Voice PE firmware pins its external components to an ESPHome dev
-commit, so a release is too old; install the dev branch into its own venv, which havoice
-finds on its own:
+commit, so a release is too old; install the dev branch into its own venv,
+`.venv-esphome/`, which havoice finds on its own:
 
 ```bash
-.venv/bin/pip install "https://github.com/esphome/esphome/archive/dev.zip"
+python3 -m venv .venv-esphome
+.venv-esphome/bin/pip install "https://github.com/esphome/esphome/archive/dev.zip"
 ```
 
 Then:
